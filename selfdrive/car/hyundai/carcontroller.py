@@ -15,7 +15,7 @@ from selfdrive.controls.lib.longcontrol import LongCtrlState
 from selfdrive.road_speed_limiter import road_speed_limiter_get_active
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
-min_set_speed = 30 * CV.KPH_TO_MS
+min_set_speed = 5 * CV.KPH_TO_MS
 
 
 def accel_hysteresis(accel, accel_steady):
@@ -80,7 +80,7 @@ class CarController():
 
     # gas_factor, brake_factor
     # Adjust it in the range of 0.7 to 1.3
-    self.scc_smoother = SccSmoother(gas_factor=1.0, brake_factor=1.0, curvature_factor=1.0)
+    self.scc_smoother = SccSmoother(gas_factor=1.0, brake_factor=1.1, curvature_factor=1.2)
 
   def update(self, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,
              left_lane, right_lane, left_lane_depart, right_lane_depart, set_speed, lead_visible, controls):
@@ -111,7 +111,7 @@ class CarController():
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
       self.turning_signal_timer = 0.5 / DT_CTRL  # Disable for 0.5 Seconds after blinker turned off
-    if self.turning_indicator_alert: # set and clear by interface
+    if self.turning_indicator_alert and CS.out.vEgo < 2 * CV.KPH_TO_MS: # set and clear by interface
       lkas_active = 0
     if self.turning_signal_timer > 0:
       self.turning_signal_timer -= 1
