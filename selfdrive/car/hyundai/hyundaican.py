@@ -94,8 +94,8 @@ def create_lfahda_mfc(packer, enabled, active):
 def create_hda_mfc(packer, active):
   values = {
     "HDA_USM": 2,
-    "HDA_Active": 1 if active > 0 else 0,
-    "HDA_Icon_State": 2 if active > 0 else 0,
+    "HDA_Active": 1 if active > 1 else 0,
+    "HDA_Icon_State": 2 if active > 1 else 0,
     "HDA_Chime": 1 if active > 1 else 0,
   }
 
