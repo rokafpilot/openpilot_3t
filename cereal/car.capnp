@@ -201,7 +201,18 @@ struct CarState {
   rightBlindspot @34 :Bool; # Is there something blocking the right lane change
 
   cruiseGap @37 : Int32;
-  autoHold @38 : Int32;
+  
+  # Gear Current By Tenesi
+  currentGear @38 :Float32;
+
+  # tpms by boxkon
+  tpmsPressureFl @39 :Float32;
+  tpmsPressureFr @40 :Float32;
+  tpmsPressureRl @41 :Float32;
+  tpmsPressureRr @42 :Float32;
+  
+  # New AutoHold by neokii
+  autoHold @43 : Int32;
 
   struct WheelSpeeds {
     # optional wheel speeds
@@ -373,6 +384,7 @@ struct CarControl {
       chimePrompt @7;
       chimeWarning2Repeat @8;
       chimeSlowingDownSpeed @9;
+      chimeDing @10;      
     }
   }
 
@@ -461,6 +473,10 @@ struct CarParams {
   hasScc13 @62 :Bool;
   hasScc14 @63 :Bool;
   hasEms @64 :Bool;
+
+  # HDA
+  hasHda @65 : Bool;
+  hdaAvailable @66 : Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);

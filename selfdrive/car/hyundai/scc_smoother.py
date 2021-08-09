@@ -23,7 +23,7 @@ WAIT_COUNT = [12, 13, 14, 15, 16]
 AliveIndex = 0
 WaitIndex = 0
 
-MIN_CURVE_SPEED = 32. * CV.KPH_TO_MS
+MIN_CURVE_SPEED = 10. * CV.KPH_TO_MS
 
 EventName = car.CarEvent.EventName
 
@@ -202,14 +202,23 @@ class SccSmoother:
 
     ascc_enabled = CS.acc_mode and enabled and CS.cruiseState_enabled \
                    and 1 < CS.cruiseState_speed < 255 and not CS.brake_pressed
+    dRel = 0.
+    lead = self.get_lead(controls.sm)
+    if lead is not None:
+      dRel = lead.dRel
+
+    # Auto-resume Cruise Set Speed by JangPoo
+    ascc_auto_set = enabled and (clu11_speed > 30 or (CS.obj_valid and dRel > 1)) \
+                    and CS.gas_pressed and CS.prev_cruiseState_speed and not CS.cruiseState_speed \
+                    and CC.sccSmoother.roadLimitSpeedActive > 0
 
     if not self.longcontrol:
-      if not ascc_enabled or CS.standstill or CS.cruise_buttons != Buttons.NONE:
+      if (not ascc_enabled or CS.standstill or CS.cruise_buttons != Buttons.NONE) and not ascc_auto_set: # Auto-resume Cruise Set Speed by JangPoo
         self.reset()
         self.wait_timer = max(ALIVE_COUNT) + max(WAIT_COUNT)
         return
 
-    if not ascc_enabled:
+    if not ascc_enabled and not ascc_auto_set: # Auto-resume Cruise Set Speed by JangPoo
       self.reset()
 
     self.cal_target_speed(CS, clu11_speed, controls)
@@ -218,10 +227,15 @@ class SccSmoother:
 
     if self.wait_timer > 0:
       self.wait_timer -= 1
-    elif ascc_enabled:
+    elif ascc_enabled or ascc_auto_set: # Auto-resume Cruise Set Speed by JangPoo
 
       if self.alive_timer == 0:
-        self.btn = self.get_button(CS.cruiseState_speed * self.speed_conv_to_clu)
+        if ascc_enabled:                # Auto-resume Cruise Set Speed by JangPoo
+          self.btn = self.get_button(CS.cruiseState_speed * self.speed_conv_to_clu)
+        elif ascc_auto_set and clu11_speed < 30:             # Auto-resume Cruise Set Speed by JangPoo
+          self.btn = Buttons.SET_DECEL  # Auto-resume Cruise Set Speed by JangPoo
+        else:
+          self.btn = Buttons.RES_ACCEL  # Auto-resume Cruise Set Speed by JangPoo
         self.alive_count = SccSmoother.get_alive_count()
 
       if self.btn != Buttons.NONE:

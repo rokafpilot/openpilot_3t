@@ -12,7 +12,7 @@ from common.numpy_fast import interp
 from common.realtime import sec_since_boot
 
 
-CAMERA_SPEED_FACTOR = 1.05
+CAMERA_SPEED_FACTOR = 1.0
 
 class Port:
   BROADCAST_PORT = 2899
@@ -269,9 +269,9 @@ class RoadSpeedLimiter:
         diff_speed = v_ego * 3.6 - cam_limit_speed
 
         if self.longcontrol:
-          sec = interp(diff_speed, [10., 30.], [13., 18.])
-        else:
           sec = interp(diff_speed, [10., 30.], [15., 20.])
+        else:
+          sec = interp(diff_speed, [10., 30.], [16., 21.])
 
         if MIN_LIMIT <= cam_limit_speed <= MAX_LIMIT and (self.slowing_down or cam_limit_speed_left_dist < v_ego * sec):
 
