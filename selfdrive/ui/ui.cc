@@ -64,15 +64,24 @@ static int get_path_length_idx(const cereal::ModelDataV2::XYZTData::Reader &line
   return max_idx;
 }
 
-static void update_leads(UIState *s, const cereal::RadarState::Reader &radar_state, std::optional<cereal::ModelDataV2::XYZTData::Reader> line) {
+static void update_leads(UIState *s, const cereal::ModelDataV2::Reader &model) {
+  auto leads = model.getLeadsV3();
+  auto model_position = model.getPosition();
   for (int i = 0; i < 2; ++i) {
-    auto lead_data = (i == 0) ? radar_state.getLeadOne() : radar_state.getLeadTwo();
-    if (lead_data.getStatus()) {
-      float z = line ? (*line).getZ()[get_path_length_idx(*line, lead_data.getDRel())] : 0.0;
-      // negative because radarState uses left positive convention
-      calib_frame_to_full_frame(s, lead_data.getDRel(), -lead_data.getYRel(), z + 1.22, &s->scene.lead_vertices[i]);
+    if (leads[i].getProb() > 0.5) {
+      float z = model_position.getZ()[get_path_length_idx(model_position, leads[i].getX()[0])];
+      calib_frame_to_full_frame(s, leads[i].getX()[0], leads[i].getY()[0], z + 1.22, &s->scene.lead_vertices[i]);
     }
   }
+}
+
+static void update_leads_radar(UIState *s, const cereal::RadarState::Reader &radar_state, std::optional<cereal::ModelDataV2::XYZTData::Reader> line) {
+  auto lead_data = radar_state.getLeadOne();
+    if (lead_data.getStatus() && lead_data.getRadar()) {
+      float z = line ? (*line).getZ()[get_path_length_idx(*line, lead_data.getDRel())] : 0.0;
+      // negative because radarState uses left positive convention
+      calib_frame_to_full_frame(s, lead_data.getDRel(), -lead_data.getYRel(), z + 1.22, &s->scene.lead_vertices_radar[0]);
+    }
 }
 
 static void update_line_data(const UIState *s, const cereal::ModelDataV2::XYZTData::Reader &line,
@@ -113,9 +122,9 @@ static void update_model(UIState *s, const cereal::ModelDataV2::Reader &model) {
   }
 
   // update path
-  auto lead_one = (*s->sm)["radarState"].getRadarState().getLeadOne();
-  if (lead_one.getStatus()) {
-    const float lead_d = lead_one.getDRel() * 2.;
+  auto lead_one = model.getLeadsV3()[0];
+  if (lead_one.getProb() > 0.5) {
+    const float lead_d = lead_one.getX()[0] * 2.;
     max_distance = std::clamp((float)(lead_d - fmin(lead_d * 0.35, 10.)), 0.0f, max_distance);
   }
   max_idx = get_path_length_idx(model_position, max_distance);
@@ -135,6 +144,44 @@ static void update_state(UIState *s) {
     scene.engageable = sm["controlsState"].getControlsState().getEngageable();
     scene.dm_active = sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode();
   }
+
+  if (sm.updated("modelV2") && s->vg) {
+    auto model = sm["modelV2"].getModelV2();
+    update_model(s, model);
+    update_leads(s, model);
+  }
+
+  if (sm.updated("liveCalibration")) {
+    scene.world_objects_visible = true;
+    auto rpy_list = sm["liveCalibration"].getLiveCalibration().getRpyCalib();
+    Eigen::Vector3d rpy;
+    rpy << rpy_list[0], rpy_list[1], rpy_list[2];
+    Eigen::Matrix3d device_from_calib = euler2rot(rpy);
+    Eigen::Matrix3d view_from_device;
+    view_from_device << 0,1,0,
+                        0,0,1,
+                        1,0,0;
+    Eigen::Matrix3d view_from_calib = view_from_device * device_from_calib;
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        scene.view_from_calib.v[i*3 + j] = view_from_calib(i,j);
+      }
+    }
+  }
+
+  if (sm.updated("pandaState")) {
+    auto pandaState = sm["pandaState"].getPandaState();
+    scene.pandaType = pandaState.getPandaType();
+    scene.ignition = pandaState.getIgnitionLine() || pandaState.getIgnitionCan();
+  } else if ((s->sm->frame - s->sm->rcv_frame("pandaState")) > 5*UI_FREQ) {
+    scene.pandaType = cereal::PandaState::PandaType::UNKNOWN;
+  }
+
+  if (sm.updated("carParams")) {
+    scene.car_params = sm["carParams"].getCarParams();
+    scene.longitudinal_control = sm["carParams"].getCarParams().getOpenpilotLongitudinalControl();
+  }
+
   if (sm.updated("carState")) {
     auto data = sm["carState"].getCarState();
     auto car_state = (*s->sm)["carState"].getCarState();
@@ -155,45 +202,7 @@ static void update_state(UIState *s) {
     scene.leftblindspot = data.getLeftBlindspot();
     scene.rightblindspot = data.getRightBlindspot();
   }
-
-  if (sm.updated("radarState") && s->vg) {
-    std::optional<cereal::ModelDataV2::XYZTData::Reader> line;
-    if (sm.rcv_frame("modelV2") > 0) {
-      line = sm["modelV2"].getModelV2().getPosition();
-    }
-    update_leads(s, sm["radarState"].getRadarState(), line);
-  }
-  if (sm.updated("liveCalibration")) {
-    scene.world_objects_visible = true;
-    auto rpy_list = sm["liveCalibration"].getLiveCalibration().getRpyCalib();
-    Eigen::Vector3d rpy;
-    rpy << rpy_list[0], rpy_list[1], rpy_list[2];
-    Eigen::Matrix3d device_from_calib = euler2rot(rpy);
-    Eigen::Matrix3d view_from_device;
-    view_from_device << 0,1,0,
-                        0,0,1,
-                        1,0,0;
-    Eigen::Matrix3d view_from_calib = view_from_device * device_from_calib;
-    for (int i = 0; i < 3; i++) {
-      for (int j = 0; j < 3; j++) {
-        scene.view_from_calib.v[i*3 + j] = view_from_calib(i,j);
-      }
-    }
-  }
-  if (sm.updated("modelV2") && s->vg) {
-    update_model(s, sm["modelV2"].getModelV2());
-  }
-  if (sm.updated("pandaState")) {
-    auto pandaState = sm["pandaState"].getPandaState();
-    scene.pandaType = pandaState.getPandaType();
-    scene.ignition = pandaState.getIgnitionLine() || pandaState.getIgnitionCan();
-  } else if ((s->sm->frame - s->sm->rcv_frame("pandaState")) > 5*UI_FREQ) {
-    scene.pandaType = cereal::PandaState::PandaType::UNKNOWN;
-  }
-  if (sm.updated("carParams")) {
-    scene.car_params = sm["carParams"].getCarParams();
-    scene.longitudinal_control = sm["carParams"].getCarParams().getOpenpilotLongitudinalControl();
-  }
+  
   if (sm.updated("sensorEvents")) {
     for (auto sensor : sm["sensorEvents"].getSensorEvents()) {
       if (!scene.started && sensor.which() == cereal::SensorEventData::ACCELERATION) {
@@ -209,18 +218,22 @@ static void update_state(UIState *s) {
       }
     }
   }
+
   if (sm.updated("roadCameraState")) {
     auto camera_state = sm["roadCameraState"].getRoadCameraState();
 
-    float max_lines = Hardware::EON() ? 5408 : 1757;
-    float gain = camera_state.getGain();
+    float max_lines = Hardware::EON() ? 5408 : 1904;
+    float max_gain = Hardware::EON() ? 1.0: 10.0;
+    float max_ev = max_lines * max_gain;
 
-    if (Hardware::TICI()) {
-      // Max gain is 4 * 2.5 (High Conversion Gain)
-      gain /= 10.0;
+    // C3 camera only uses about 10% of available gain at night
+    if (Hardware::TICI) {
+      max_ev /= 10;
     }
 
-    scene.light_sensor = std::clamp<float>((1023.0 / max_lines) * (max_lines - camera_state.getIntegLines() * gain), 0.0, 1023.0);
+    float ev = camera_state.getGain() * float(camera_state.getIntegLines());
+
+    scene.light_sensor = std::clamp<float>(1.0 - (ev / max_ev), 0.0, 1.0);
   }
   scene.started = sm["deviceState"].getDeviceState().getStarted() && scene.ignition;
 }
@@ -309,12 +322,20 @@ static void update_extras(UIState *s)
 
    if(sm.updated("liveParameters"))
     scene.live_params = sm["liveParameters"].getLiveParameters();
-	
+
    if (sm.updated("ubloxGnss")) {
     auto data = sm["ubloxGnss"].getUbloxGnss();
     if (data.which() == cereal::UbloxGnss::MEASUREMENT_REPORT) {
       scene.satelliteCount = data.getMeasurementReport().getNumMeas();
     }
+   }
+   
+   if (sm.updated("radarState") && s->vg) {
+    std::optional<cereal::ModelDataV2::XYZTData::Reader> line;
+    if (sm.rcv_frame("modelV2") > 0) {
+      line = sm["modelV2"].getModelV2().getPosition();
+    }
+    update_leads_radar(s, sm["radarState"].getRadarState(), line);
   }
 
 
@@ -331,10 +352,9 @@ static void update_extras(UIState *s)
 
 QUIState::QUIState(QObject *parent) : QObject(parent) {
   ui_state.sm = std::make_unique<SubMaster, const std::initializer_list<const char *>>({
-    "modelV2", "controlsState", "liveCalibration", "radarState", "deviceState", "roadCameraState",
+    "modelV2", "controlsState", "liveCalibration", "deviceState", "roadCameraState",
     "pandaState", "carParams", "driverMonitoringState", "sensorEvents", "carState", "liveLocationKalman",
-    "gpsLocationExternal", "roadCameraState",
-    "carControl", "liveParameters", "ubloxGnss"});
+    "gpsLocationExternal", "radarState", "carControl", "liveParameters", "ubloxGnss"});
 
   ui_state.fb_w = vwp_w;
   ui_state.fb_h = vwp_h;
@@ -402,9 +422,19 @@ void Device::setAwake(bool on, bool reset) {
 }
 
 void Device::updateBrightness(const UIState &s) {
-  float brightness_b = 10;
-  float brightness_m = 0.1;
-  float clipped_brightness = std::min(100.0f, (s.scene.light_sensor * brightness_m) + brightness_b);
+  // Scale to 0% to 100%
+  float clipped_brightness = 100.0 * s.scene.light_sensor;
+
+  // CIE 1931 - https://www.photonstophotos.net/GeneralTopics/Exposure/Psychometric_Lightness_and_Gamma.htm
+  if (clipped_brightness <= 8) {
+    clipped_brightness = (clipped_brightness / 903.3);
+  } else {
+    clipped_brightness = std::pow((clipped_brightness + 16.0) / 116.0, 3.0);
+  }
+
+  // Scale back to 10% to 100%
+  clipped_brightness = std::clamp(100.0f * clipped_brightness, 10.0f, 100.0f);
+
   if (!s.scene.started) {
     clipped_brightness = BACKLIGHT_OFFROAD;
   }

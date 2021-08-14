@@ -15,6 +15,7 @@ class nTune():
     self.CP = CP
     self.lqr = None
     self.group = group
+    self.config = {}
 
     if "LatControlLQR" in str(type(controller)):
       self.lqr = controller
@@ -66,8 +67,9 @@ class nTune():
       if os.path.isfile(self.file):
         with open(self.file, 'r') as f:
           self.config = json.load(f)
-          if self.checkValid():
-            self.write_config(self.config)
+
+        if self.checkValid():
+          self.write_config(self.config)
 
           self.update()
       else:
@@ -80,9 +82,7 @@ class nTune():
           self.update()
 
     except:
-      return False
-
-    return True
+      self.write_default()
 
   def checkValue(self, key, min_, max_, default_):
     updated = False
@@ -178,8 +178,6 @@ class nTune():
 
   def read_cp(self):
 
-    self.config = {}
-
     try:
       if self.CP is not None:
 
@@ -211,7 +209,7 @@ class nTune():
     try:
       with open(self.file, 'w') as f:
         json.dump(conf, f, indent=2, sort_keys=False)
-        os.chmod(self.file, 0o764)
+        os.chmod(self.file, 0o666)
     except IOError:
 
       try:
@@ -220,7 +218,7 @@ class nTune():
 
         with open(self.file, 'w') as f:
           json.dump(conf, f, indent=2, sort_keys=False)
-          os.chmod(self.file, 0o764)
+          os.chmod(self.file, 0o666)
       except:
         pass
 
