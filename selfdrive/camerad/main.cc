@@ -44,12 +44,11 @@ void party(cl_device_id device_id, cl_context context) {
 #endif
 
 int main(int argc, char *argv[]) {
-  if (!Hardware::PC()) {
-    int ret;
-    ret = util::set_realtime_priority(53);
-    assert(ret == 0);
-    ret = util::set_core_affinity({Hardware::EON() ? 2 : 6});
-    assert(ret == 0 || Params().getBool("IsOffroad")); // failure ok while offroad due to offlining cores
+  set_realtime_priority(53);
+  if (Hardware::EON()) {
+    int set_core_affinity(2);
+  } else if (Hardware::TICI()) {
+    int set_core_affinity(6);
   }
 
   cl_device_id device_id = cl_get_device_id(CL_DEVICE_TYPE_DEFAULT);
