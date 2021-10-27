@@ -1,15 +1,65 @@
-
-**This is based on xx979xx for Hyundai, Kia, Genesis.**
-
-https://github.com/xx979xx/openpilot
-
-It is open source and inherits MIT license.  By installing this software you accept all responsibility for anything that might occur while you use it.  All contributors to this fork are not liable.  <b>Use at your own risk.</b>
-
-
-------------------------------------------------------
-
-
 ![](https://user-images.githubusercontent.com/37757984/127420744-89ca219c-8f8e-46d3-bccf-c1cb53b81bb1.png)
+
+crwusiz openpilot
+=====
+<b> crwusiz branch is neokii modify branch base (comma.ai master-ci and xx979xx HKG_community source) </b>
+- <b> v0.8.10 [ eon + black panda, comma two, comma three support ] </b>
+- <b> [ ~~allow white panda and gray panda~~ ] </b>
+- <b> [ OP3T support (installer/howto_op3t_update.md) ] </b> 
+- If you have any questions, please send a message to crwusiz from discord. if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b>for me
+- It is open source and inherits MIT license. 
+- By installing this software you accept all responsibility for anything that might occur while you use it.
+- All contributors to this fork are not liable. <b>Use at your own risk.</b>
+
+[![](https://i.imgur.com/TMtVMV8.png)](#)
+- kor NanumGothic font
+- event message, qt ui kor translate
+- steeringwheel rotate 
+- blinker display
+- brake, bsd, gps icon
+- autohold, tpms display
+- sidebar wifi ipaddress 
+- lateralcontrolselect ( PID / INDI / LQR )
+- mfcselect ( LKAS / LDWS / LFA )
+- longcontrolselect ( MAD / MAD+LONG )
+- add toggle / function / simple ui
+- LongitudinalControl full support
+- comma three support
+
+----------- ↓ eon ( lepro x720 or oneplus 3t or comma two ) ----------- 
+- Comma Bootlogo / Bootanimation Auto install
+- battery charging and battery percent display
+
+
+## Source Code Reference
+- https://github.com/commaai/openpilot
+- https://github.com/xx979xx/openpilo
+- https://github.com/xps-genesis/openpilot
+- https://github.com/kegman/openpilot
+- https://github.com/dragonpilot-community/dragonpilot
+- https://github.com/wirelessnet2/openpilot
+- https://github.com/sshane/openpilot
+- https://github.com/arne182/ArnePilot
+- https://github.com/neokii
+- https://github.com/openpilotusers
+- https://github.com/Circuit-Pro/openpilot
+- - -
+## Harness Cable and Car Year Compatible Chart
+
+cable order -> https://smartstore.naver.com/hyotrade/products/5341431170
+
+[![](https://i.imgur.com/aspMjGT.jpg)](#)
+[![](https://i.imgur.com/1DB7gyL.jpg)](#)
+[![](https://i.imgur.com/2r43I6d.jpg)](#)
+[![](https://i.imgur.com/N5IkjUX.jpg)](#)
+[![](https://i.imgur.com/HaXcjPI.jpg)](#)
+ 
+## chevrolet bolt branch
+- https://github.com/JasonJShuler/openpilot
+- https://github.com/hanabi95/openpilot
+- https://github.com/jc01rho-openpilot-BoltEV2019-KoKr
+- https://github.com/parksunkyu81
+- - -
 
 Table of Contents
 =======================
@@ -28,7 +78,7 @@ Table of Contents
 What is openpilot?
 ------
 
-[openpilot](http://github.com/commaai/openpilot) is an open source driver assistance system. Currently, openpilot performs the functions of Adaptive Cruise Control (ACC), Automated Lane Centering (ALC), Forward Collision Warning (FCW) and Lane Departure Warning (LDW) for a growing variety of [supported car makes, models and model years](docs/CARS.md). In addition, while openpilot is engaged, a camera based Driver Monitoring (DM) feature alerts distracted and asleep drivers. See more about [the vehicle integration](docs/INTEGRATION.md) and [limitations](docs/LIMITATIONS.md).
+[openpilot](http://github.com/commaai/openpilot) is an open source driver assistance system. Currently, openpilot performs the functions of Adaptive Cruise Control (ACC), Automated Lane Centering (ALC), Forward Collision Warning (FCW) and Lane Departure Warning (LDW) for a growing variety of [supported car makes, models and model years](docs/CARS.md). In addition, while openpilot is engaged, a camera based Driver Monitoring (DM) feature alerts distracted and asleep drivers. See more about [the vehicle integration and limitations here](docs/INTEGRATION.md).
 
 <table>
   <tr>
@@ -71,8 +121,6 @@ Community and Contributing
 ------
 
 openpilot is developed by [comma](https://comma.ai/) and by users like you. We welcome both pull requests and issues on [GitHub](http://github.com/commaai/openpilot). Bug fixes and new car ports are encouraged. Check out [the contributing docs](docs/CONTRIBUTING.md).
-
-Documentation related to openpilot development can be found on [docs.comma.ai](https://docs.comma.ai). Information about running openpilot (e.g. FAQ, fingerprinting, troubleshooting, custom forks, community hardware) should go on the [wiki](https://github.com/commaai/openpilot/wiki).
 
 You can add support for your car by following guides we have written for [Brand](https://blog.comma.ai/how-to-write-a-car-port-for-openpilot/) and [Model](https://blog.comma.ai/openpilot-port-guide-for-toyota-models/) ports. Generally, a car with adaptive cruise control and lane keep assist is a good candidate. [Join our Discord](https://discord.comma.ai) to discuss car ports: most car makes have a dedicated channel.
 
