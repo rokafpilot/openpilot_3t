@@ -52,7 +52,11 @@ int main(int argc, char *argv[]) {
     assert(ret == 0 || Params().getBool("IsOffroad")); // failure ok while offroad due to offlining cores
   }
 
+  #ifdef XNX
+  cl_device_id device_id = cl_get_device_id(CL_DEVICE_TYPE_GPU);
+  #else
   cl_device_id device_id = cl_get_device_id(CL_DEVICE_TYPE_DEFAULT);
+  #endif
 
    // TODO: do this for QCOM2 too
 #if defined(QCOM)
