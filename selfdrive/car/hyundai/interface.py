@@ -27,8 +27,8 @@ class CarInterface(CarInterfaceBase):
     gas_max_bp = [0., 10., 20., 50., 80., 100., 130.]
     gas_max_v = [2.5, 1.5, 0.9, 0.6, 0.3, 0.2, 0.1]
 
-    brake_max_bp = [0, 50., 80., 130.]
-    brake_max_v = [CarControllerParams.ACCEL_MIN, -3., -3.5, -2.3]
+    brake_max_bp = [0, 10, 50., 80., 130.]
+    brake_max_v = [-2., CarControllerParams.ACCEL_MIN, -3., -3.5, -2.3]
 
     return interp(v_current_kph, brake_max_bp, brake_max_v), interp(v_current_kph, gas_max_bp, gas_max_v)
 
