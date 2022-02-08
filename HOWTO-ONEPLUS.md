@@ -16,7 +16,8 @@ git clone https://github.com/kans-ky/opa8.git openpilot --branch Volt-oneplus3
 ```
 chmod 700 /data/openpilot/unix.sh;
 chmod 700 /data/openpilot/scripts/oneplus_update_neos.sh;
-cd /data/openpilot/ && ./unix.sh; ./oneplus_update_neos.sh
+cd /data/openpilot/ && ./unix.sh; 
+cd /data/openpilot/scripts/ && ./oneplus_update_neos.sh
 ```
 
 3. 원플용 Neos(recovery, system 이미지)가 다운로드되면 자동으로 부팅됩니다. 
