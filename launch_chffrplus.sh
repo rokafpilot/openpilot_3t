@@ -87,7 +87,7 @@ elif [ "$(getprop persist.sys.locale)" != "ko-KR" ]; then
   reboot
 
 elif [ -f "../../VERSION" ]; then
-  sed -i 's/17/19/' ../../VERSION
+  sed -i 's/17/19.1/' ../../VERSION
 
 else
   chmod 644 /data/openpilot/installer/boot_finish
