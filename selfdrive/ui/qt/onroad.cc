@@ -408,10 +408,7 @@ void NvgWindow::drawHud(QPainter &p) {
   drawDebugText(p);
 
   const auto controls_state = sm["controlsState"].getControlsState();
-  const auto car_params = sm["carParams"].getCarParams();
   const auto live_params = sm["liveParameters"].getLiveParameters();
-
-  bool is_metric = s->scene.is_metric;
 
   // kph
 
@@ -570,14 +567,14 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
 
   if(limit_speed > 10 && left_dist > 0)
   {
-    int radius = 192;
+    int radius_ = 192;
 
     int x = 480;
     int y = 50;
 
     p.setPen(Qt::NoPen);
     p.setBrush(QBrush(QColor(255, 0, 0, 255)));
-    QRect rect = QRect(x, y, radius, radius);
+    QRect rect = QRect(x, y, radius_, radius_);
     p.drawEllipse(rect);
 
     p.setBrush(QBrush(QColor(255, 255, 255, 255)));
@@ -599,18 +596,18 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     p.drawText(rect, Qt::AlignCenter, str_limit_speed);
 
     configFont(p, "Open Sans", 60, "Bold");
-    rect.translate(0, radius/2 + 45);
+    rect.translate(0, radius_/2 + 45);
     rect.adjust(-30, 0, 30, 0);
     p.setPen(QColor(255, 255, 255, 230));
     p.drawText(rect, Qt::AlignCenter, str_left_dist);
   }
   else {
-    auto controls_state = sm["controlsState"].getControlsState();
+    // auto controls_state = sm["controlsState"].getControlsState();
     int sccStockCamAct = (int)controls_state.getSccStockCamAct();
     int sccStockCamStatus = (int)controls_state.getSccStockCamStatus();
 
     if(sccStockCamAct == 2 && sccStockCamStatus == 2) {
-      int radius = 192;
+      int radius_ = 192;
 
       int x = 480;
       int y = 50;
@@ -618,7 +615,7 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
       p.setPen(Qt::NoPen);
 
       p.setBrush(QBrush(QColor(255, 0, 0, 255)));
-      QRect rect = QRect(x, y, radius, radius);
+      QRect rect = QRect(x, y, radius_, radius_);
       p.drawEllipse(rect);
 
       p.setBrush(QBrush(QColor(255, 255, 255, 255)));
@@ -674,11 +671,7 @@ void NvgWindow::drawDebugText(QPainter &p) {
 
   auto controls_state = sm["controlsState"].getControlsState();
   auto car_control = sm["carControl"].getCarControl();
-  auto car_state = sm["carState"].getCarState();
   auto device_state = sm["deviceState"].getDeviceState();
-
-  int sccStockCamAct = (int)controls_state.getSccStockCamAct();
-  int sccStockCamStatus = (int)controls_state.getSccStockCamStatus();
 
   int longControlState = (int)controls_state.getLongControlState();
   float vPid = controls_state.getVPid();

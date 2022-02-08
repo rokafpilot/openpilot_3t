@@ -68,7 +68,7 @@ class CarController():
       idx = (frame // 4) % 4
 
       # Auto Hold State
-      if CS.cruiseMain and not c.active and CS.autoHold and CS.autoHoldActive and \
+      if CS.cruiseMain and not enabled and CS.autoHold and CS.autoHoldActive and \
              not CS.out.gasPressed and CS.out.gearShifter == 'drive' and \
              CS.out.vEgo < 0.01 and not CS.regenPaddlePressed and CS.autoholdBrakeStart:
 
@@ -84,8 +84,8 @@ class CarController():
         car_stopping = self.apply_gas < P.ZERO_GAS
         standstill = CS.pcm_acc_status == AccState.STANDSTILL
 
-        at_full_stop = c.active and standstill and car_stopping
-        near_stop = c.active and (CS.out.vEgo < P.NEAR_STOP_BRAKE_PHASE) and car_stopping
+        at_full_stop = enabled and standstill and car_stopping
+        near_stop = enabled and (CS.out.vEgo < P.NEAR_STOP_BRAKE_PHASE) and car_stopping
         can_sends.append(gmcan.create_friction_brake_command(self.packer_ch, CanBus.CHASSIS, self.apply_brake, idx, near_stop, at_full_stop))
         CS.autoHoldActivated = False
 
