@@ -299,6 +299,10 @@ def thermald_thread(end_event, hw_queue):
         restart_triggered_ts = sec_since_boot()
 
     if sm.updated['pandaStates'] and len(pandaStates) > 0:
+
+      # Set ignition based on any panda connected
+      onroad_conditions["ignition"] = any(ps.ignitionLine or ps.ignitionCan for ps in pandaStates if ps.pandaType != log.PandaState.PandaType.unknown)
+
       pandaState = pandaStates[0]
 
       if pandaState.pandaType != log.PandaState.PandaType.unknown:
@@ -400,7 +404,8 @@ def thermald_thread(end_event, hw_queue):
     startup_conditions["hardware_supported"] = pandaStates is not None
 
     if TICI:
-      set_offroad_alert_if_changed("Offroad_StorageMissing", (not Path("/data/media").is_mount()))
+      missing = (not Path("/data/media").is_mount()) and (not os.path.isfile("/persist/comma/living-in-the-moment"))
+      set_offroad_alert_if_changed("Offroad_StorageMissing", missing)
 
     # Handle offroad/onroad transition
     should_start = all(onroad_conditions.values())
