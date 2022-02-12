@@ -24,6 +24,9 @@ class kegman_kans_conf():
       if self.conf['Kf'] == "-1":
         self.conf['Kf'] = str('{:f}'.format(CP.lateralTuning.pid.kf))
         write_conf = True
+      if self.conf['steerMax'] == "-1":
+        self.conf['steerMax'] = str(round(CP.steerMaxV[0], 2))
+        write_conf = True
 
     if write_conf:
       self.write_config(self.config)
@@ -43,7 +46,8 @@ class kegman_kans_conf():
       if "tuneGernby" not in self.config:
         self.config.update({"tuneGernby":"1"})
         self.config.update({"Kp":"0.2"})
-        self.config.update({"Ki":"0.05"})
+        self.config.update({"Ki":"0.0175"})
+        self.config.update({"steerMax":"4.7"})
         self.element_updated = True
 
       if "liveParams" not in self.config:
@@ -51,7 +55,7 @@ class kegman_kans_conf():
         self.element_updated = True
 
       if "STOPPING_DISTANCE" not in self.config:
-        self.config.update({"STOPPING_DISTANCE":"1.0"})
+        self.config.update({"STOPPING_DISTANCE":"1.2"})
         self.element_updated = True
 
       if "deadzone" not in self.config:
@@ -63,7 +67,7 @@ class kegman_kans_conf():
         self.element_updated = True
 
       if "steerLimitTimer" not in self.config:
-        self.config.update({"steerLimitTimer":"3.5"})
+        self.config.update({"steerLimitTimer":"0.5"})
         self.element_updated = True
 
       if "CruiseDelta" not in self.config:
@@ -89,9 +93,9 @@ class kegman_kans_conf():
     else:
       self.config = {"battChargeMin":"70", "battChargeMax":"90", \
          "battPercOff":"91", "carVoltageMinEonShutdown":"12000", \
-         "steerLimitTimer":"3.5", "tuneGernby":"1", "AutoHold":"1", \
-         "Kp":"0.2", "Ki":"0.05", "Kf":"1.", \
-         "STOPPING_DISTANCE":"1.0", "CruiseDelta":"5", "CruiseEnableMin":"10", \
+         "steerLimitTimer":"0.5", "tuneGernby":"1", "AutoHold":"1", \
+         "Kp":"0.2", "Ki":"0.0175", "Kf":"1.", "steerMax":"4.7", \
+         "STOPPING_DISTANCE":"1.2", "CruiseDelta":"5", "CruiseEnableMin":"10", \
          "liveParams":"1", "deadzone":"0.0", \
          "epsModded": "0", "CAMERA_SPEED_FACTOR":"0.98"}
 
