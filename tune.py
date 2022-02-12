@@ -64,7 +64,7 @@ button_delay = 0.1
 kegman_kans = kegman_kans_conf()
 kegman_kans.conf['tuneGernby'] = "1"
 param = ["Kp", "Ki", "Kf", "CAMERA_SPEED_FACTOR", \
-         "steerLimitTimer", "deadzone", "STOPPING_DISTANCE"]
+         "steerLimitTimer", "steerMax", "deadzone", "STOPPING_DISTANCE"]
 
 j = 0
 while True:
@@ -193,6 +193,12 @@ while True:
 
   if float(kegman_kans.conf['steerLimitTimer']) > 7:
     kegman_kans.conf['steerLimitTimer'] = "7"
+
+  if float(kegman_kans.conf['steerMax']) < 0 and float(kegman_kans.conf['steerMax']) != -1:
+    kegman_kans.conf['steerMax'] = "0"
+
+  if float(kegman_kans.conf['steerMax']) > 2:
+    kegman_kans.conf['steerMax'] = "2"
 
   if float(kegman_kans.conf['deadzone']) < 0.01 and float(kegman_kans.conf['deadzone']) != -1:
     kegman_kans.conf['deadzone'] = "0.0"
