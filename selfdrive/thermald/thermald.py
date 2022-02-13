@@ -305,8 +305,8 @@ def thermald_thread(end_event, hw_queue):
 
       pandaState = pandaStates[0]
 
+      # neokii
       if pandaState.pandaType != log.PandaState.PandaType.unknown:
-        onroad_conditions["ignition"] = pandaState.ignitionLine or pandaState.ignitionCan
         panda_state_ts = sec_since_boot()
 
       in_car = pandaState.harnessStatus != log.PandaState.HarnessStatus.notConnected
@@ -327,6 +327,8 @@ def thermald_thread(end_event, hw_queue):
           cloudlog.info("Setting up EON fan handler")
           setup_eon_fan()
           handle_fan = handle_fan_eon
+
+    # neokii
     else:
       if sec_since_boot() - panda_state_ts > 3.:
         if onroad_conditions["ignition"]:

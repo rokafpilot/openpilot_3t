@@ -164,6 +164,7 @@ class CarState(CarStateBase):
       ("TractionControlOn", "ESPStatus"),
       ("EPBClosed", "EPBStatus"),
       ("CruiseMainOn", "ECMEngineStatus"),
+      ("Brake_Pressed", "ECMEngineStatus"),
       ("LKAButton", "ASCMSteeringButton"),
       ("DistanceButton", "ASCMSteeringButton"),
       ("LKATorqueDelivered", "PSCMStatus"),

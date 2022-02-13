@@ -264,8 +264,6 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.stockFcw: {},
 
-  EventName.lkasDisabled: {},
-
   # ********** events only containing alerts displayed in all states **********
 
   EventName.joystickDebug: {
@@ -508,7 +506,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # current GPS position. This alert is thrown when the localizer is reset
   # more often than expected.
   EventName.localizerMalfunction: {
-    ET.PERMANENT: NormalPermanentAlert("Sensor Malfunction", "Contact Support"),
+    # ET.PERMANENT: NormalPermanentAlert("Sensor Malfunction", "Contact Support"),
   },
 
   # ********** events that affect controls state transitions **********
@@ -821,6 +819,11 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   EventName.lowSpeedLockout: {
     ET.PERMANENT: NormalPermanentAlert("Cruise Fault: Restart the car to engage"),
     ET.NO_ENTRY: NoEntryAlert("Cruise Fault: Restart the Car"),
+  },
+
+  EventName.lkasDisabled: {
+    ET.PERMANENT: NormalPermanentAlert("LKAS Disabled: Enable LKAS to engage"),
+    ET.NO_ENTRY: NoEntryAlert("LKAS Disabled"),
   },
 
   EventName.autoHoldActivated: {

@@ -17,6 +17,7 @@ else:
 
 from casadi import SX, vertcat
 from selfdrive.kegman_kans_conf import kegman_kans_conf
+kegman_kans = kegman_kans_conf()
 
 LONG_MPC_DIR = os.path.dirname(os.path.abspath(__file__))
 EXPORT_DIR = os.path.join(LONG_MPC_DIR, "c_generated_code")
@@ -36,7 +37,7 @@ X_EGO_COST = 0.
 V_EGO_COST = 0.
 A_EGO_COST = 0.
 J_EGO_COST = 5.0
-A_CHANGE_COST = .15 # 브레이킹 시점을 빠르게 하려면 이 값(가속변화량 코스트)을 낮춤
+A_CHANGE_COST = .125 # 브레이킹 시점과 재출발을 빠르게 하려면 이 값(가속변화량 코스트)을 낮춤
 DANGER_ZONE_COST = 100.
 CRASH_DISTANCE = .5
 LIMIT_COST = 1e6
@@ -210,9 +211,9 @@ class LongitudinalMpc:
     self.reset()
     self.source = SOURCES[2]
 
-    self.sd_counter = 0
-    kegman_kans = kegman_kans_conf()
-    self.stopping_distane = float(kegman_kans.conf['STOPPING_DISTANCE'])
+    self.mpc_frame = 0
+    self.kegman_kans = kegman_kans_conf()
+    self.stopping_distane = float(self.kegman_kans.conf['STOPPING_DISTANCE'])
 
   def reset(self):
     self.solver = AcadosOcpSolverFast('long', N, EXPORT_DIR)
@@ -323,11 +324,11 @@ class LongitudinalMpc:
     v_ego = self.x0[1]
     a_ego = self.x0[2]
     # Live Tuning of stopping distance
-    self.sd_counter += 1
-    if self.sd_counter % 500 == 0:
-      kegman_kans = kegman_kans_conf()
-      self.stopping_distane = float(kegman_kans.conf['STOPPING_DISTANCE'])
-      self.sd_counter = 0
+    self.mpc_frame += 1
+    if self.mpc_frame % 500 == 0:
+      self.kegman_kans = kegman_kans_conf()
+      self.stopping_distane = float(self.kegman_kans.conf['STOPPING_DISTANCE'])
+      self.mpc_frame = 0
 
     self.status = radarstate.leadOne.status or radarstate.leadTwo.status
 
