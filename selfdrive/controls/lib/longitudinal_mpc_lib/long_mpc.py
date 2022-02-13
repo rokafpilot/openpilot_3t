@@ -325,7 +325,7 @@ class LongitudinalMpc:
     a_ego = self.x0[2]
     # Live Tuning of stopping distance
     self.mpc_frame += 1
-    if self.mpc_frmae % 500 == 0:
+    if self.mpc_frame % 500 == 0:
       self.kegman_kans = kegman_kans_conf()
       self.stopping_distane = float(self.kegman_kans.conf['STOPPING_DISTANCE'])
       self.mpc_frame = 0

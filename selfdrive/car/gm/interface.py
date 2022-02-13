@@ -8,6 +8,7 @@ from selfdrive.car.gm.values import CAR, Ecu, ECU_FINGERPRINT, CruiseButtons, \
                                     AccState, FINGERPRINTS, CarControllerParams
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, is_ecu_disconnected, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
+from selfdrive.kegman_kans_conf import kegman_kans_conf
 
 ButtonType = car.CarState.ButtonEvent.Type
 EventName = car.CarEvent.EventName
@@ -72,6 +73,12 @@ class CarInterface(CarInterfaceBase):
     ret.steerActuatorDelay = 0.1
 
     if candidate == CAR.VOLT:
+      # live tune
+      kegman_kans = kegman_kans_conf()
+      ret.steerMaxBP = [0.]
+      ret.steerMaxV = [float(kegman_kans.conf['steerMax'])]
+      ret.steerLimitTimer = float(kegman_kans.conf['steerLimitTimer'])
+
       # supports stop and go, but initial engage must be above 18mph (which include conservatism)
       ret.minEnableSpeed = -1 * CV.MPH_TO_MS
       ret.mass = 1607. + STD_CARGO_KG
@@ -80,8 +87,6 @@ class CarInterface(CarInterfaceBase):
       ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
       ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.01], [0.2]]
       tire_stiffness_factor = 0.469 # Stock Michelin Energy Saver A/S, LiveParameters
-      ret.steerMaxBP = [0.]
-      ret.steerMaxV = [1.25]
       ret.steerRatioRear = 0.
       ret.centerToFront = ret.wheelbase * 0.45  # wild guess
       ret.lateralTuning.pid.kf = 1. # get_steer_feedforward_volt()
@@ -168,8 +173,7 @@ class CarInterface(CarInterfaceBase):
     ret.stopAccel = -2.0
     ret.stoppingDecelRate = 3.2
     ret.vEgoStopping = 0.6
-    ret.vEgoStarting = 0.25
-    ret.steerLimitTimer = 3.5
+    ret.vEgoStarting = 0.12
     ret.radarTimeStep = 0.0667  # GM radar runs at 15Hz instead of standard 20Hz
 
     return ret

@@ -47,7 +47,7 @@ IGNORE_PROCESSES = {"rtshield", "uploader", "deleter", "loggerd", "logmessaged",
 
 ACTUATOR_FIELDS = set(car.CarControl.Actuators.schema.fields.keys())
 
-MIN_CURVE_SPEED = 41. * CV.KPH_TO_MS
+MIN_CURVE_SPEED = 40. * CV.KPH_TO_MS
 
 ThermalStatus = log.DeviceState.ThermalStatus
 State = log.ControlsState.OpenpilotState
@@ -200,8 +200,6 @@ class Controls:
     """Compute carEvents from carState"""
 
     self.events.clear()
-    self.events.add_from_msg(CS.events)
-    self.events.add_from_msg(self.sm['driverMonitoringState'].events)
 
     # Handle startup event
     if self.startup_event is not None:

@@ -79,7 +79,7 @@ void OnroadWindow::mousePressEvent(QMouseEvent* e) {
 void OnroadWindow::offroadTransition(bool offroad) {
 #ifdef ENABLE_MAPS
   if (!offroad) {
-    if (map == nullptr && (uiState()->has_prime || !MAPBOX_TOKEN.isEmpty())) {
+    if (map == nullptr && (uiState()->prime_type || !MAPBOX_TOKEN.isEmpty())) {
       MapWindow * m = new MapWindow(get_mapbox_settings());
       m->setFixedWidth(topWidget(this)->width() / 2);
       m->offroadTransition(offroad);
@@ -545,11 +545,11 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
   int limit_speed = 0;
   int left_dist = 0;
 
-  if(camLimitSpeed >= 30 && camLimitSpeedLeftDist > 0) {
+  if(camLimitSpeed > 0 && camLimitSpeedLeftDist > 0) {
     limit_speed = camLimitSpeed;
     left_dist = camLimitSpeedLeftDist;
   }
-  else if(sectionLimitSpeed >= 30 && sectionLeftDist > 0) {
+  else if(sectionLimitSpeed > 0 && sectionLeftDist > 0) {
     limit_speed = sectionLimitSpeed;
     left_dist = sectionLeftDist;
   }
@@ -706,6 +706,7 @@ void NvgWindow::drawDebugText(QPainter &p) {
   p.drawText(text_x, y, str);
 
   y += height;
+  p.setPen(QColor(0, 255, 0, 200));
   str.sprintf("Accel: %.3f\n", accel);
   p.drawText(text_x, y, str);
 
@@ -716,12 +717,13 @@ void NvgWindow::drawDebugText(QPainter &p) {
   float vision_dist = lead_one.getProb() > .5 ? (lead_one.getX()[0] - 1.5) : 0;
 
   y += height;
-  str.sprintf("Lead: %.1f/%.1f/%.1f\n", radar_dist, vision_dist, (radar_dist - vision_dist));
+  str.sprintf("차간거리: %.1f/%.1f/%.1f\n", radar_dist, vision_dist, (radar_dist - vision_dist));
   p.drawText(text_x, y, str);
 
   y += height;
 
   //engine RPM
+  p.setPen(QColor(255, 255, 255, 200));
   int rpm = s->scene.engineRPM;
   if(s->scene.engineRPM == 0) {
     str.sprintf("Engine RPM: OFF");
