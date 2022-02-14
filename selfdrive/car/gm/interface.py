@@ -85,12 +85,12 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.69
       ret.steerRatio = 17.7
       ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
-      ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.01], [0.2]]
+      ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.0175], [0.155]]
       tire_stiffness_factor = 0.469 # Stock Michelin Energy Saver A/S, LiveParameters
       ret.steerRatioRear = 0.
       ret.centerToFront = ret.wheelbase * 0.45  # wild guess
       ret.lateralTuning.pid.kf = 1. # get_steer_feedforward_volt()
-      ret.steerActuatorDelay = 0.2
+      ret.steerActuatorDelay = 0.375
 
       # D gain
       ret.lateralTuning.pid.kdBP = [0., 15., 33.]
@@ -165,11 +165,11 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.deadzoneV = [0.0, .14]
 
     ret.longitudinalTuning.kpBP = [-.36 * CV.KPH_TO_MS, 10 * CV.KPH_TO_MS, 20 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [4.6, 3.8, 3.2, 1.3, 0.6, 0.3]
+    ret.longitudinalTuning.kpV = [4., 3.5, 3.0, 1.2, 0.8, 0.5]
     ret.longitudinalTuning.kiBP = [-.36 * CV.KPH_TO_MS, 20 * CV.KPH_TO_MS, 30 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kiV = [0.5, 0.53, 0.62, 0.68, 0.6, 0.36]
+    ret.longitudinalTuning.kiV = [0.4, 0.53, 0.62, 0.68, 0.6, 0.36]
     ret.longitudinalTuning.kdBP = [-0.1, 15., 33.]
-    ret.longitudinalTuning.kdV = [0.29, 0.65, 0.95]
+    ret.longitudinalTuning.kdV = [0.39, 0.65, 0.95]
     ret.stopAccel = -2.0
     ret.stoppingDecelRate = 3.2
     ret.vEgoStopping = 0.6
