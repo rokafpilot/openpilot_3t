@@ -47,7 +47,7 @@ IGNORE_PROCESSES = {"rtshield", "uploader", "deleter", "loggerd", "logmessaged",
 
 ACTUATOR_FIELDS = set(car.CarControl.Actuators.schema.fields.keys())
 
-MIN_CURVE_SPEED = 40. * CV.KPH_TO_MS
+MIN_CURVE_SPEED = 45. * CV.KPH_TO_MS
 
 ThermalStatus = log.DeviceState.ThermalStatus
 State = log.ControlsState.OpenpilotState
@@ -167,6 +167,8 @@ class Controls:
     self.road_limit_left_dist = 0
     self.v_cruise_kph_limit = 0
     self.curve_speed_ms = 255.
+    self.sccStockCamStatus = 0
+    self.sccStockCamAct = 0
     self.left_lane_visible = False
     self.right_lane_visible = False
 
@@ -743,6 +745,8 @@ class Controls:
     controlsState.angleSteers = steer_angle_without_offset * CV.RAD_TO_DEG
     controlsState.roadLimitSpeed = self.road_limit_speed
     controlsState.roadLimitSpeedLeftDist = self.road_limit_left_dist
+    controlsState.sccStockCamAct = self.sccStockCamAct
+    controlsState.sccStockCamStatus = self.sccStockCamStatus
 
     # display SR/SRC/SAD on Ui
     controlsState.steerRatio = self.VM.sR
