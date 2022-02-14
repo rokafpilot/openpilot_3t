@@ -602,7 +602,7 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     p.drawText(rect, Qt::AlignCenter, str_left_dist);
   }
   else {
-    // auto controls_state = sm["controlsState"].getControlsState();
+    auto controls_state = sm["controlsState"].getControlsState();
     int sccStockCamAct = (int)controls_state.getSccStockCamAct();
     int sccStockCamStatus = (int)controls_state.getSccStockCamStatus();
 
@@ -717,6 +717,7 @@ void NvgWindow::drawDebugText(QPainter &p) {
   float vision_dist = lead_one.getProb() > .5 ? (lead_one.getX()[0] - 1.5) : 0;
 
   y += height;
+  p.setPen(QColor(255, 255, 255, 200));
   str.sprintf("차간거리: %.1f/%.1f/%.1f\n", radar_dist, vision_dist, (radar_dist - vision_dist));
   p.drawText(text_x, y, str);
 
@@ -736,6 +737,7 @@ void NvgWindow::drawDebugText(QPainter &p) {
   y += height;
 
   //현재 조향각
+  p.setPen(QColor(0, 255, 0, 200));
   float angleSteers = controls_state.getAngleSteers();
   str.sprintf("핸들각: %.1f°", angleSteers);
   p.drawText(text_x, y, str);
@@ -756,6 +758,7 @@ void NvgWindow::drawDebugText(QPainter &p) {
   y += height;
 
   //Cpu 온도
+  p.setPen(QColor(255, 255, 255, 200));
   float cpuTemp = 0;
   auto cpuList = device_state.getCpuTempC();
 
