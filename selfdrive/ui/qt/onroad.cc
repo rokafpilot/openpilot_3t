@@ -533,7 +533,7 @@ void NvgWindow::drawSpeed(QPainter &p) {
 void NvgWindow::drawSpeedLimit(QPainter &p) {
   const SubMaster &sm = *(uiState()->sm);
   auto roadLimitSpeed = sm["roadLimitSpeed"].getRoadLimitSpeed();
-  auto controls_state = sm["controlsState"].getControlsState();
+
   int activeNDA = roadLimitSpeed.getActive();
 
   int camLimitSpeed = roadLimitSpeed.getCamLimitSpeed();
