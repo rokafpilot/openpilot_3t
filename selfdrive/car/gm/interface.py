@@ -85,12 +85,12 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.69
       ret.steerRatio = 17.7
       ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
-      ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.01], [0.2]]
+      ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.0175], [0.155]]
       tire_stiffness_factor = 0.469 # Stock Michelin Energy Saver A/S, LiveParameters
       ret.steerRatioRear = 0.
       ret.centerToFront = ret.wheelbase * 0.45  # wild guess
       ret.lateralTuning.pid.kf = 1. # get_steer_feedforward_volt()
-      ret.steerActuatorDelay = 0.2
+      ret.steerActuatorDelay = 0.375
 
       # D gain
       ret.lateralTuning.pid.kdBP = [0., 15., 33.]

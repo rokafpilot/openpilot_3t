@@ -45,9 +45,8 @@ class kegman_kans_conf():
 
       if "tuneGernby" not in self.config:
         self.config.update({"tuneGernby":"1"})
-        self.config.update({"Kp":"0.2"})
+        self.config.update({"Kp":"0.155"})
         self.config.update({"Ki":"0.0175"})
-        self.config.update({"steerMax":"4.7"})
         self.element_updated = True
 
       if "liveParams" not in self.config:
@@ -86,6 +85,10 @@ class kegman_kans_conf():
         self.config.update({"CAMERA_SPEED_FACTOR":"0.98"})
         self.element_updated = True
 
+      if "steerMax" not in self.config:
+        self.config.update({"steerMax":"2.8"})
+        self.element_updated = True
+
       if self.element_updated:
         print("updated")
         self.write_config(self.config)
@@ -94,7 +97,7 @@ class kegman_kans_conf():
       self.config = {"battChargeMin":"70", "battChargeMax":"90", \
          "battPercOff":"91", "carVoltageMinEonShutdown":"12000", \
          "steerLimitTimer":"0.5", "tuneGernby":"1", "AutoHold":"1", \
-         "Kp":"0.2", "Ki":"0.0175", "Kf":"1.", "steerMax":"4.7", \
+         "Kp":"0.155", "Ki":"0.0175", "Kf":"1.", "steerMax":"2.8", \
          "STOPPING_DISTANCE":"1.2", "CruiseDelta":"5", "CruiseEnableMin":"10", \
          "liveParams":"1", "deadzone":"0.0", \
          "epsModded": "0", "CAMERA_SPEED_FACTOR":"0.98"}
