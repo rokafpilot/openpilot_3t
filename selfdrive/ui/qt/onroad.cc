@@ -748,6 +748,7 @@ void NvgWindow::drawDebugText(QPainter &p) {
   y += height;
 
   //필요 조향각
+  p.setPen(QColor(255, 255, 255, 200));
   auto carControl = sm["carControl"].getCarControl();
   if (carControl.getEnabled()) {
     auto actuators = carControl.getActuators();
@@ -762,7 +763,7 @@ void NvgWindow::drawDebugText(QPainter &p) {
   y += height;
 
   //Cpu 온도
-  p.setPen(QColor(255, 255, 255, 200));
+  p.setPen(QColor(0, 255, 0, 200));
   float cpuTemp = 0;
   auto cpuList = device_state.getCpuTempC();
 

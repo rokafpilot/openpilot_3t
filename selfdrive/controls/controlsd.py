@@ -30,7 +30,7 @@ from selfdrive.locationd.calibrationd import Calibration
 from selfdrive.hardware import HARDWARE, TICI, EON
 from selfdrive.manager.process_config import managed_processes
 from selfdrive.ntune import ntune_common_get, ntune_common_enabled, ntune_scc_get
-from selfdrive.road_speed_limiter import road_speed_limiter_get_max_speed
+from selfdrive.road_speed_limiter import get_road_speed_limiter # road_speed_limiter_get_max_speed
 from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
 
 SOFT_DISABLE_TIME = 3  # seconds
@@ -163,8 +163,6 @@ class Controls:
     self.button_timers = {ButtonEvent.Type.decelCruise: 0, ButtonEvent.Type.accelCruise: 0}
     self.last_actuators = car.CarControl.Actuators.new_message()
 
-    self.road_limit_speed = 0
-    self.road_limit_left_dist = 0
     self.v_cruise_kph_limit = 0
     self.curve_speed_ms = 255.
     self.sccStockCamStatus = 0
@@ -450,12 +448,14 @@ class Controls:
     elif CS.cruiseState.enabled:
       self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
 
-    limit_speed, self.road_limit_speed, self.road_limit_left_dist, first_started, log = road_speed_limiter_get_max_speed(CS, self.v_cruise_kph)
+    road_speed_limiter = get_road_speed_limiter()
+    apply_limit_speed, road_limit_speed, left_dist, first_started, log = \
+      road_speed_limiter.get_max_speed(CS, self.v_cruise_kph)
 
-    if limit_speed > 20:
-      self.v_cruise_kph_limit = min(limit_speed, self.v_cruise_kph)
+    if apply_limit_speed > 20:
+      self.v_cruise_kph_limit = min(apply_limit_speed, self.v_cruise_kph)
 
-      if limit_speed < CS.vEgo * CV.MS_TO_KPH:
+      if apply_limit_speed < CS.vEgo * CV.MS_TO_KPH:
         self.events.add(EventName.slowingDownSpeed)
 
     else:
@@ -743,8 +743,6 @@ class Controls:
     controlsState.canErrorCounter = self.can_rcv_error_counter
 
     controlsState.angleSteers = steer_angle_without_offset * CV.RAD_TO_DEG
-    controlsState.roadLimitSpeed = self.road_limit_speed
-    controlsState.roadLimitSpeedLeftDist = self.road_limit_left_dist
     controlsState.sccStockCamAct = self.sccStockCamAct
     controlsState.sccStockCamStatus = self.sccStockCamStatus
 
