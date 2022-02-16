@@ -583,8 +583,8 @@ struct ControlsState @0x97ff69c53601abf1 {
 
   decelForModel @63 :Bool;
   # Road Speed Limiter
-  roadLimitSpeed @64 :Int32;
-  roadLimitSpeedLeftDist @65 :Int32;
+  sccStockCamAct @64 :Float32;
+  sccStockCamStatus @65 :Float32;
 
   # Ui display
   steerRatio @60 :Float32;
@@ -603,10 +603,6 @@ struct ControlsState @0x97ff69c53601abf1 {
   sccCurvatureFactor @68 :Float32;
   longitudinalActuatorDelayLowerBound @69 :Float32;
   longitudinalActuatorDelayUpperBound @70 :Float32;
-
-  sccStockCamAct @71 :Float32;
-  sccStockCamStatus @72 :Float32;
-
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
     disabled @0;

@@ -81,11 +81,15 @@ void OnroadWindow::offroadTransition(bool offroad) {
   if (!offroad) {
     if (map == nullptr && (uiState()->prime_type || !MAPBOX_TOKEN.isEmpty())) {
       MapWindow * m = new MapWindow(get_mapbox_settings());
-      m->setFixedWidth(topWidget(this)->width() / 2);
-      m->offroadTransition(offroad);
-      QObject::connect(uiState(), &UIState::offroadTransition, m, &MapWindow::offroadTransition);
-      split->addWidget(m, 0, Qt::AlignRight);
       map = m;
+
+      QObject::connect(uiState(), &UIState::offroadTransition, m, &MapWindow::offroadTransition);
+
+      m->setFixedWidth(topWidget(this)->width() / 2);
+      split->addWidget(m, 0, Qt::AlignRight);
+
+      // Make map visible after adding to split
+      m->offroadTransition(offroad);
     }
   }
 #endif
@@ -744,6 +748,7 @@ void NvgWindow::drawDebugText(QPainter &p) {
   y += height;
 
   //필요 조향각
+  p.setPen(QColor(255, 255, 255, 200));
   auto carControl = sm["carControl"].getCarControl();
   if (carControl.getEnabled()) {
     auto actuators = carControl.getActuators();
@@ -758,7 +763,7 @@ void NvgWindow::drawDebugText(QPainter &p) {
   y += height;
 
   //Cpu 온도
-  p.setPen(QColor(255, 255, 255, 200));
+  p.setPen(QColor(0, 255, 0, 200));
   float cpuTemp = 0;
   auto cpuList = device_state.getCpuTempC();
 
