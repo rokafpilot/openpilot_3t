@@ -1,14 +1,18 @@
 import math
 import numpy as np
 
-from common.numpy_fast import clip
+from common.numpy_fast import clip, interp
 from common.realtime import DT_CTRL
 from cereal import log
 from selfdrive.controls.lib.drive_helpers import get_steer_max
+from selfdrive.controls.lib.latcontrol import LatControl, MIN_STEER_SPEED
 
+TORQUE_SCALE_BP = [0., 30., 80., 100., 130.]
+TORQUE_SCALE_V = [0.2, 0.35, 0.65, 0.7, 0.75]
 
-class LatControlLQR():
-  def __init__(self, CP):
+class LatControlLQR(LatControl):
+  def __init__(self, CP, CI):
+    super().__init__(CP, CI)
     self.scale = CP.lateralTuning.lqr.scale
     self.ki = CP.lateralTuning.lqr.ki
 
@@ -29,6 +33,7 @@ class LatControlLQR():
     self.reset()
 
   def reset(self):
+    super().reset()
     self.i_lqr = 0.0
     self.sat_count = 0.0
 
@@ -44,16 +49,18 @@ class LatControlLQR():
 
     return self.sat_count > self.sat_limit
 
-  def update(self, active, CS, CP, VM, params, desired_curvature, desired_curvature_rate):
+  def update(self, active, CS, CP, VM, params, last_actuators, desired_curvature, desired_curvature_rate):
     lqr_log = log.ControlsState.LateralLQRState.new_message()
 
     steers_max = get_steer_max(CP, CS.vEgo)
-    torque_scale = (0.45 + CS.vEgo / 60.0)**2  # Scale actuator model with speed
+    #torque_scale = (0.45 + CS.vEgo / 60.0)**2  # Scale actuator model with speed
+    #torque_scale = (0.13 + CS.vEgo / 60.0)**0.8
+    torque_scale = interp(CS.vEgo*3.6, TORQUE_SCALE_BP, TORQUE_SCALE_V)
 
     # Subtract offset. Zero angle should correspond to zero torque
     steering_angle_no_offset = CS.steeringAngleDeg - params.angleOffsetAverageDeg
 
-    desired_angle = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo))
+    desired_angle = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
 
     instant_offset = params.angleOffsetDeg - params.angleOffsetAverageDeg
     desired_angle += instant_offset  # Only add offset that originates from vehicle model errors
@@ -98,5 +105,5 @@ class LatControlLQR():
     lqr_log.i = self.i_lqr
     lqr_log.output = output_steer
     lqr_log.lqrOutput = lqr_output
-    lqr_log.saturated = saturated
+    lqr_log.saturated = self._check_saturation(steers_max - abs(output_steer) < 1e-3, CS)
     return output_steer, desired_angle, lqr_log

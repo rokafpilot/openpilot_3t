@@ -3,6 +3,8 @@
 #include <cmath>
 
 #include <QDebug>
+#include <QSound>
+#include <QMouseEvent>
 
 #include "selfdrive/common/timing.h"
 #include "selfdrive/ui/qt/util.h"
@@ -44,8 +46,8 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   QObject::connect(uiState(), &UIState::uiUpdate, this, &OnroadWindow::updateState);
   QObject::connect(uiState(), &UIState::offroadTransition, this, &OnroadWindow::offroadTransition);
 
-#ifdef QCOM2
   // screen recoder - neokii
+
   record_timer = std::make_shared<QTimer>();
 	QObject::connect(record_timer.get(), &QTimer::timeout, [=]() {
     if(recorder) {
@@ -64,7 +66,7 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   stacked_layout->addWidget(recorder_widget);
   recorder_widget->raise();
   alerts->raise();
-#endif
+
 }
 
 void OnroadWindow::updateState(const UIState &s) {
@@ -73,6 +75,8 @@ void OnroadWindow::updateState(const UIState &s) {
   if (s.sm->updated("controlsState") || !alert.equal({})) {
     if (alert.type == "controlsUnresponsive") {
       bgColor = bg_colors[STATUS_ALERT];
+    } else if (alert.type == "controlsUnresponsivePermanent") {
+      bgColor = bg_colors[STATUS_DISENGAGED];
     }
     alerts->updateAlert(alert, bgColor);
   }
@@ -86,13 +90,56 @@ void OnroadWindow::updateState(const UIState &s) {
   }
 }
 
-void OnroadWindow::mousePressEvent(QMouseEvent* e) {
+void OnroadWindow::mouseReleaseEvent(QMouseEvent* e) {
+
+  QPoint endPos = e->pos();
+  int dx = endPos.x() - startPos.x();
+  int dy = endPos.y() - startPos.y();
+  if(std::abs(dx) > 250 || std::abs(dy) > 200) {
+
+    if(std::abs(dx) < std::abs(dy)) {
+
+      if(dy < 0) { // upward
+        Params().remove("CalibrationParams");
+        Params().remove("LiveParameters");
+        QTimer::singleShot(1500, []() {
+          Params().putBool("SoftRestartTriggered", true);
+        });
+
+        QSound::play("../assets/sounds/reset_calibration.wav");
+      }
+      else { // downward
+        QTimer::singleShot(500, []() {
+          Params().putBool("SoftRestartTriggered", true);
+        });
+      }
+    }
+    else if(std::abs(dx) > std::abs(dy)) {
+      if(dx < 0) { // right to left
+        if(recorder)
+          recorder->toggle();
+      }
+      else { // left to right
+        if(recorder)
+          recorder->toggle();
+      }
+    }
+
+    return;
+  }
+
   if (map != nullptr) {
     bool sidebarVisible = geometry().x() > 0;
     map->setVisible(!sidebarVisible && !map->isVisible());
   }
+
   // propagation event to parent(HomeWindow)
-  QWidget::mousePressEvent(e);
+  QWidget::mouseReleaseEvent(e);
+}
+
+void OnroadWindow::mousePressEvent(QMouseEvent* e) {
+  startPos = e->pos();
+  //QWidget::mousePressEvent(e);
 }
 
 void OnroadWindow::offroadTransition(bool offroad) {
@@ -100,10 +147,15 @@ void OnroadWindow::offroadTransition(bool offroad) {
   if (!offroad) {
     if (map == nullptr && (uiState()->has_prime || !MAPBOX_TOKEN.isEmpty())) {
       MapWindow * m = new MapWindow(get_mapbox_settings());
-      m->setFixedWidth(topWidget(this)->width() / 2);
-      QObject::connect(uiState(), &UIState::offroadTransition, m, &MapWindow::offroadTransition);
-      split->addWidget(m, 0, Qt::AlignRight);
       map = m;
+
+      QObject::connect(uiState(), &UIState::offroadTransition, m, &MapWindow::offroadTransition);
+
+      m->setFixedWidth(topWidget(this)->width() / 2);
+      split->addWidget(m, 0, Qt::AlignRight);
+
+      // Make map visible after adding to split
+      m->offroadTransition(offroad);
     }
   }
 #endif
@@ -113,6 +165,11 @@ void OnroadWindow::offroadTransition(bool offroad) {
   // update stream type
   bool wide_cam = Hardware::TICI() && Params().getBool("EnableWideCamera");
   nvg->setStreamType(wide_cam ? VISION_STREAM_RGB_WIDE : VISION_STREAM_RGB_BACK);
+
+  if(offroad && recorder) {
+    recorder->stop(false);
+  }
+
 }
 
 void OnroadWindow::paintEvent(QPaintEvent *event) {
@@ -360,7 +417,7 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIScene &scene) {
   }
   // paint path
   QLinearGradient bg(0, height(), 0, height() / 4);
-  bg.setColorAt(0, scene.end_to_end ? redColor() : QColor(255, 255, 255));
+  bg.setColorAt(0, scene.end_to_end ? redColor(200) : QColor(255, 255, 255, 200));
   bg.setColorAt(1, scene.end_to_end ? redColor(0) : QColor(255, 255, 255, 0));
   painter.setBrush(bg);
   painter.drawPolygon(scene.track_vertices.v, scene.track_vertices.cnt);
@@ -455,11 +512,11 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
   int limit_speed = 0;
   int left_dist = 0;
 
-  if(camLimitSpeed >= 30 && camLimitSpeedLeftDist > 0) {
+  if(camLimitSpeed > 0 && camLimitSpeedLeftDist > 0) {
     limit_speed = camLimitSpeed;
     left_dist = camLimitSpeedLeftDist;
   }
-  else if(sectionLimitSpeed >= 30 && sectionLeftDist > 0) {
+  else if(sectionLimitSpeed > 0 && sectionLeftDist > 0) {
     limit_speed = sectionLimitSpeed;
     left_dist = sectionLeftDist;
   }
@@ -475,16 +532,16 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
       p.drawPixmap(x, y, w, h, activeNDA == 1 ? ic_nda : ic_hda);
   }
 
-  if(limit_speed > 10 && left_dist > 0)
+  if(limit_speed > 10 && limit_speed < 130)
   {
-    int radius = 192;
+    int radius_ = 192;
 
     int x = 30;
     int y = 270;
 
     p.setPen(Qt::NoPen);
     p.setBrush(QBrush(QColor(255, 0, 0, 255)));
-    QRect rect = QRect(x, y, radius, radius);
+    QRect rect = QRect(x, y, radius_, radius_);
     p.drawEllipse(rect);
 
     p.setBrush(QBrush(QColor(255, 255, 255, 255)));
@@ -498,17 +555,19 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
 
     if(left_dist >= 1000)
       str_left_dist.sprintf("%.1fkm", left_dist / 1000.f);
-    else
+    else if(left_dist > 0)
       str_left_dist.sprintf("%dm", left_dist);
 
     configFont(p, "Open Sans", 80, "Bold");
     p.setPen(QColor(0, 0, 0, 230));
     p.drawText(rect, Qt::AlignCenter, str_limit_speed);
 
-    configFont(p, "Open Sans", 60, "Bold");
-    rect.translate(0, radius/2 + 45);
-    rect.adjust(-30, 0, 30, 0);
-    p.setPen(QColor(255, 255, 255, 230));
-    p.drawText(rect, Qt::AlignCenter, str_left_dist);
+    if(str_left_dist.length() > 0) {
+      configFont(p, "Open Sans", 60, "Bold");
+      rect.translate(0, radius_/2 + 45);
+      rect.adjust(-30, 0, 30, 0);
+      p.setPen(QColor(255, 255, 255, 230));
+      p.drawText(rect, Qt::AlignCenter, str_left_dist);
+    }
   }
 }

@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
 import datetime
 import os
+import queue
+import threading
 import time
+from collections import OrderedDict, namedtuple
 from pathlib import Path
 from typing import Dict, Optional, Tuple
-from collections import namedtuple, OrderedDict
 
 import psutil
 from smbus2 import SMBus
 
 import cereal.messaging as messaging
 from cereal import log
+from common.dict_helpers import strip_deprecated_keys
 from common.filter_simple import FirstOrderFilter
 from common.numpy_fast import interp
 from common.params import Params, ParamKeyType
 from common.realtime import DT_TRML, sec_since_boot
-from common.dict_helpers import strip_deprecated_keys
 from selfdrive.controls.lib.alertmanager import set_offroad_alert
 from selfdrive.controls.lib.pid import PIController
-from selfdrive.hardware import EON, TICI, PC, HARDWARE
+from selfdrive.hardware import EON, HARDWARE, PC, TICI
 from selfdrive.loggerd.config import get_available_percent
+from selfdrive.kegman_kans_conf import kegman_kans_conf
+kegman_kans = kegman_kans_conf()
 from selfdrive.swaglog import cloudlog
 from selfdrive.thermald.power_monitoring import PowerMonitoring
 from selfdrive.version import terms_version, training_version
@@ -30,8 +34,10 @@ NetworkStrength = log.DeviceState.NetworkStrength
 CURRENT_TAU = 15.   # 15s time constant
 TEMP_TAU = 5.   # 5s time constant
 DISCONNECT_TIMEOUT = 5.  # wait 5 seconds before going offroad after disconnect so you get an alert
+PANDA_STATES_TIMEOUT = int(1000 * 2.5 * DT_TRML)  # 2.5x the expected pandaState frequency
 
 ThermalBand = namedtuple("ThermalBand", ['min_temp', 'max_temp'])
+HardwareState = namedtuple("HardwareState", ['network_type', 'network_strength', 'network_info', 'nvme_temps', 'modem_temps', 'wifi_address'])
 
 # List of thermal bands. We will stay within this region as long as we are within the bounds.
 # When exiting the bounds, we'll jump to the lower or higher band. Bands are ordered in the dict.
@@ -95,19 +101,13 @@ def set_eon_fan(val):
       try:
         i = [0x1, 0x3 | 0, 0x3 | 0x08, 0x3 | 0x10][val]
         bus.write_i2c_block_data(0x3d, 0, [i])
-      except IOError:
+      except OSError:
       # tusb320
         if val == 0:
           bus.write_i2c_block_data(0x67, 0xa, [0])
-          #bus.write_i2c_block_data(0x67, 0x45, [1<<2])
         else:
-          #bus.write_i2c_block_data(0x67, 0x45, [0])
           bus.write_i2c_block_data(0x67, 0xa, [0x20])
           bus.write_i2c_block_data(0x67, 0x8, [(val - 1) << 6])
-    else:
-      bus.write_byte_data(0x21, 0x04, 0x2)
-      bus.write_byte_data(0x21, 0x03, (val*2)+1)
-      bus.write_byte_data(0x21, 0x04, 0x4)
     bus.close()
     last_eon_fan_val = val
 
@@ -164,6 +164,21 @@ def handle_fan_tici(controller, max_cpu_temp, fan_speed, ignition):
   last_ignition = ignition
   return fan_pwr_out
 
+# from bellow line, to control charging disabled
+def check_car_battery_voltage(should_start, pandaStates, charging_disabled, msg):
+  sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "managerState"])
+  sm.update(0)
+  peripheralState = sm['peripheralState']
+  print(pandaStates)
+
+  if charging_disabled and msg.deviceState.batteryPercent < int(kegman_kans.conf['battChargeMin']):
+    charging_disabled = False
+    os.system('echo "1" > /sys/class/power_supply/battery/charging_enabled')
+  elif msg.deviceState.batteryPercent > int(kegman_kans.conf['battChargeMax']):
+    charging_disabled = True
+    os.system('echo "0" > /sys/class/power_supply/battery/charging_enabled')
+
+  return charging_disabled # to this line
 
 def set_offroad_alert_if_changed(offroad_alert: str, show_alert: bool, extra_text: Optional[str]=None):
   if prev_offroad_states.get(offroad_alert, None) == (show_alert, extra_text):
@@ -172,22 +187,60 @@ def set_offroad_alert_if_changed(offroad_alert: str, show_alert: bool, extra_tex
   set_offroad_alert(offroad_alert, show_alert, extra_text)
 
 
-def thermald_thread():
+def hw_state_thread(end_event, hw_queue):
+  """Handles non critical hardware state, and sends over queue"""
+  count = 0
+  registered_count = 0
 
+  while not end_event.is_set():
+    # these are expensive calls. update every 10s
+    if (count % int(10. / DT_TRML)) == 0:
+      try:
+        network_type = HARDWARE.get_network_type()
+
+        hw_state = HardwareState(
+          network_type=network_type,
+          network_strength=HARDWARE.get_network_strength(network_type),
+          network_info=HARDWARE.get_network_info(),
+          nvme_temps=HARDWARE.get_nvme_temperatures(),
+          modem_temps=HARDWARE.get_modem_temperatures(),
+          wifi_address=HARDWARE.get_ip_address(),
+        )
+
+        try:
+          hw_queue.put_nowait(hw_state)
+        except queue.Full:
+          pass
+
+        if TICI and (hw_state.network_info is not None) and (hw_state.network_info.get('state', None) == "REGISTERED"):
+          registered_count += 1
+        else:
+          registered_count = 0
+
+        if registered_count > 10:
+          cloudlog.warning(f"Modem stuck in registered state {hw_state.network_info}. nmcli conn up lte")
+          os.system("nmcli conn up lte")
+          registered_count = 0
+
+      except Exception:
+        cloudlog.exception("Error getting network status")
+
+    count += 1
+    time.sleep(DT_TRML)
+
+
+def thermald_thread(end_event, hw_queue):
   pm = messaging.PubMaster(['deviceState'])
-
-  pandaState_timeout = int(1000 * 2.5 * DT_TRML)  # 2.5x the expected pandaState frequency
-  pandaState_sock = messaging.sub_sock('pandaStates', timeout=pandaState_timeout)
-  sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "managerState"])
+  sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "controlsState", "pandaStates"], poll=["pandaStates"])
 
   fan_speed = 0
   count = 0
 
-  onroad_conditions = {
+  onroad_conditions: Dict[str, bool] = {
     "ignition": False,
   }
-  startup_conditions = {}
-  startup_conditions_prev = {}
+  startup_conditions: Dict[str, bool] = {}
+  startup_conditions_prev: Dict[str, bool] = {}
 
   off_ts = None
   started_ts = None
@@ -195,59 +248,65 @@ def thermald_thread():
   thermal_status = ThermalStatus.green
   usb_power = True
 
-  network_type = NetworkType.none
-  network_strength = NetworkStrength.unknown
-  wifiIpAddress = 'N/A'
-  network_info = None
-  modem_version = None
-  registered_count = 0
-  nvme_temps = None
-  modem_temps = None
+  last_hw_state = HardwareState(
+    network_type=NetworkType.none,
+    network_strength=NetworkStrength.unknown,
+    network_info = None,
+    nvme_temps=[],
+    modem_temps=[],
+    wifi_address='N/A',
+  )
 
   current_filter = FirstOrderFilter(0., CURRENT_TAU, DT_TRML)
   temp_filter = FirstOrderFilter(0., TEMP_TAU, DT_TRML)
-  pandaState_prev = None
+  charging_disabled = False
   should_start_prev = False
   in_car = False
   handle_fan = None
   is_uno = False
-  ui_running_prev = False
+  has_relay = False
+  engaged_prev = False
 
   params = Params()
   power_monitor = PowerMonitoring()
-  no_panda_cnt = 0
 
   HARDWARE.initialize_hardware()
   thermal_config = HARDWARE.get_thermal_config()
 
+  restart_triggered_ts = 0.
+  panda_state_ts = 0.
+
   # TODO: use PI controller for UNO
   controller = PIController(k_p=0, k_i=2e-3, neg_limit=-80, pos_limit=0, rate=(1 / DT_TRML))
 
-  # Leave flag for loggerd to indicate device was left onroad
-  if params.get_bool("IsOnroad"):
-    params.put_bool("BootedOnroad", True)
+  while not end_event.is_set():
+    sm.update(PANDA_STATES_TIMEOUT)
 
-  while True:
-    pandaStates = messaging.recv_sock(pandaState_sock, wait=True)
-
-    sm.update(0)
+    pandaStates = sm['pandaStates']
     peripheralState = sm['peripheralState']
 
     msg = read_thermal(thermal_config)
 
-    if pandaStates is not None and len(pandaStates.pandaStates) > 0:
-      pandaState = pandaStates.pandaStates[0]
+    # neokii
+    if sec_since_boot() - restart_triggered_ts < 5.:
+      onroad_conditions["not_restart_triggered"] = False
+    else:
+      onroad_conditions["not_restart_triggered"] = True
 
-      # If we lose connection to the panda, wait 5 seconds before going offroad
-      if pandaState.pandaType == log.PandaState.PandaType.unknown:
-        no_panda_cnt += 1
-        if no_panda_cnt > DISCONNECT_TIMEOUT / DT_TRML:
-          if onroad_conditions["ignition"]:
-            cloudlog.error("Lost panda connection while onroad")
-          onroad_conditions["ignition"] = False
-      else:
-        no_panda_cnt = 0
-        onroad_conditions["ignition"] = pandaState.ignitionLine or pandaState.ignitionCan
+      if params.get_bool("SoftRestartTriggered"):
+        params.put_bool("SoftRestartTriggered", False)
+        restart_triggered_ts = sec_since_boot()
+
+    if sm.updated['pandaStates'] and len(pandaStates) > 0:
+
+      # Set ignition based on any panda connected
+      onroad_conditions["ignition"] = any(ps.ignitionLine or ps.ignitionCan for ps in pandaStates if ps.pandaType != log.PandaState.PandaType.unknown)
+
+      pandaState = pandaStates[0]
+
+      # neokii
+      if pandaState.pandaType != log.PandaState.PandaType.unknown:
+        panda_state_ts = sec_since_boot()
 
       in_car = pandaState.harnessStatus != log.PandaState.HarnessStatus.notConnected
       usb_power = peripheralState.usbPowerMode != log.PeripheralState.UsbPowerMode.client
@@ -255,6 +314,7 @@ def thermald_thread():
       # Setup fan handler on first connect to panda
       if handle_fan is None and peripheralState.pandaType != log.PandaState.PandaType.unknown:
         is_uno = peripheralState.pandaType == log.PandaState.PandaType.uno
+        has_relay = peripheralState.pandaType in [log.PandaState.PandaType.blackPanda, log.PandaState.PandaType.uno, log.PandaState.PandaType.dos]
 
         if TICI:
           cloudlog.info("Setting up TICI fan handler")
@@ -267,58 +327,35 @@ def thermald_thread():
           setup_eon_fan()
           handle_fan = handle_fan_eon
 
-      # Handle disconnect
-      if pandaState_prev is not None:
-        if pandaState.pandaType == log.PandaState.PandaType.unknown and \
-          pandaState_prev.pandaType != log.PandaState.PandaType.unknown:
-          params.clear_all(ParamKeyType.CLEAR_ON_PANDA_DISCONNECT)
-      pandaState_prev = pandaState
+    # neokii
+    else:
+      if sec_since_boot() - panda_state_ts > 3.:
+        if onroad_conditions["ignition"]:
+          cloudlog.error("Lost panda connection while onroad")
+        onroad_conditions["ignition"] = False
 
-    # these are expensive calls. update every 10s
-    if (count % int(10. / DT_TRML)) == 0:
-      try:
-        network_type = HARDWARE.get_network_type()
-        network_strength = HARDWARE.get_network_strength(network_type)
-        network_info = HARDWARE.get_network_info()  # pylint: disable=assignment-from-none
-        nvme_temps = HARDWARE.get_nvme_temperatures()
-        modem_temps = HARDWARE.get_modem_temperatures()
-        wifiIpAddress = HARDWARE.get_ip_address()
-
-        # Log modem version once
-        if modem_version is None:
-          modem_version = HARDWARE.get_modem_version()  # pylint: disable=assignment-from-none
-          if modem_version is not None:
-            cloudlog.warning(f"Modem version: {modem_version}")
-
-        if TICI and (network_info.get('state', None) == "REGISTERED"):
-          registered_count += 1
-        else:
-          registered_count = 0
-
-        if registered_count > 10:
-          cloudlog.warning(f"Modem stuck in registered state {network_info}. nmcli conn up lte")
-          os.system("nmcli conn up lte")
-          registered_count = 0
-
-      except Exception:
-        cloudlog.exception("Error getting network status")
+    try:
+      last_hw_state = hw_queue.get_nowait()
+    except queue.Empty:
+      pass
 
     msg.deviceState.freeSpacePercent = get_available_percent(default=100.0)
     msg.deviceState.memoryUsagePercent = int(round(psutil.virtual_memory().percent))
     msg.deviceState.cpuUsagePercent = [int(round(n)) for n in psutil.cpu_percent(percpu=True)]
     msg.deviceState.gpuUsagePercent = int(round(HARDWARE.get_gpu_usage_percent()))
-    msg.deviceState.networkType = network_type
-    msg.deviceState.networkStrength = network_strength
-    msg.deviceState.wifiIpAddress = wifiIpAddress
-    if network_info is not None:
-      msg.deviceState.networkInfo = network_info
-    if nvme_temps is not None:
-      msg.deviceState.nvmeTempC = nvme_temps
-    if modem_temps is not None:
-      msg.deviceState.modemTempC = modem_temps
+
+    msg.deviceState.networkType = last_hw_state.network_type
+    msg.deviceState.networkStrength = last_hw_state.network_strength
+    if last_hw_state.network_info is not None:
+      msg.deviceState.networkInfo = last_hw_state.network_info
+
+    msg.deviceState.nvmeTempC = last_hw_state.nvme_temps
+    msg.deviceState.modemTempC = last_hw_state.modem_temps
+    msg.deviceState.wifiIpAddress = last_hw_state.wifi_address
 
     msg.deviceState.screenBrightnessPercent = HARDWARE.get_screen_brightness()
     msg.deviceState.batteryPercent = HARDWARE.get_battery_capacity()
+    msg.deviceState.batteryStatus = HARDWARE.get_battery_status()
     msg.deviceState.batteryCurrent = HARDWARE.get_battery_current()
     msg.deviceState.usbOnline = HARDWARE.get_usb_present()
     current_filter.update(msg.deviceState.batteryCurrent / 1e6)
@@ -332,7 +369,7 @@ def thermald_thread():
       msg.deviceState.fanSpeedPercentDesired = fan_speed
 
     is_offroad_for_5_min = (started_ts is None) and ((not started_seen) or (off_ts is None) or (sec_since_boot() - off_ts > 60 * 5))
-    if is_offroad_for_5_min and max_comp_temp > OFFROAD_DANGER_TEMP:
+    if max_comp_temp > 105. or (has_relay and is_offroad_for_5_min and max_comp_temp > OFFROAD_DANGER_TEMP):
       # If device is offroad we want to cool down before going onroad
       # since going onroad increases load and can make temps go over 107
       thermal_status = ThermalStatus.danger
@@ -348,10 +385,10 @@ def thermald_thread():
 
     # Ensure date/time are valid
     now = datetime.datetime.utcnow()
-    startup_conditions["time_valid"] = (now.year > 2020) or (now.year == 2020 and now.month >= 10)
+    startup_conditions["time_valid"] = True #(now.year > 2020) or (now.year == 2020 and now.month >= 10)
     set_offroad_alert_if_changed("Offroad_InvalidTime", (not startup_conditions["time_valid"]))
 
-    startup_conditions["up_to_date"] = params.get("Offroad_ConnectivityNeeded") is None or params.get_bool("DisableUpdates") or params.get_bool("SnoozeUpdate")
+    startup_conditions["up_to_date"] = True #params.get("Offroad_ConnectivityNeeded") is None or params.get_bool("DisableUpdates") or params.get_bool("SnoozeUpdate")
     startup_conditions["not_uninstalling"] = not params.get_bool("DoUninstall")
     startup_conditions["accepted_terms"] = params.get("HasAcceptedTerms") == terms_version
 
@@ -365,9 +402,11 @@ def thermald_thread():
     # controls will warn with CPU above 95 or battery above 60
     onroad_conditions["device_temp_good"] = thermal_status < ThermalStatus.danger
     set_offroad_alert_if_changed("Offroad_TemperatureTooHigh", (not onroad_conditions["device_temp_good"]))
+    startup_conditions["hardware_supported"] = pandaStates is not None
 
     if TICI:
-      set_offroad_alert_if_changed("Offroad_StorageMissing", (not Path("/data/media").is_mount()))
+      missing = (not Path("/data/media").is_mount()) and (not os.path.isfile("/persist/comma/living-in-the-moment"))
+      set_offroad_alert_if_changed("Offroad_StorageMissing", missing)
 
     # Handle offroad/onroad transition
     should_start = all(onroad_conditions.values())
@@ -377,7 +416,22 @@ def thermald_thread():
     if should_start != should_start_prev or (count == 0):
       params.put_bool("IsOnroad", should_start)
       params.put_bool("IsOffroad", not should_start)
+
+      params.put_bool("IsEngaged", False)
+      engaged_prev = False
       HARDWARE.set_power_save(not should_start)
+
+    if sm.updated['controlsState']:
+      engaged = sm['controlsState'].enabled
+      if engaged != engaged_prev:
+        params.put_bool("IsEngaged", engaged)
+        engaged_prev = engaged
+
+      try:
+        with open('/dev/kmsg', 'w') as kmsg:
+          kmsg.write(f"<3>[thermald] engaged: {engaged}\n")
+      except Exception:
+        pass
 
     if should_start:
       off_ts = None
@@ -391,6 +445,18 @@ def thermald_thread():
       started_ts = None
       if off_ts is None:
         off_ts = sec_since_boot()
+# from bellow line, to control charging disabled
+        os.system('echo powersave > /sys/class/devfreq/soc:qcom,cpubw/governor')
+
+    charging_disabled = check_car_battery_voltage(should_start, pandaStates, charging_disabled, msg)
+
+    if msg.deviceState.batteryCurrent > 0:
+      msg.deviceState.batteryStatus = "Discharging"
+    else:
+      msg.deviceState.batteryStatus = "Charging"
+
+
+    msg.deviceState.chargingDisabled = charging_disabled #to this line
 
     # Offroad power monitoring
     power_monitor.calculate(peripheralState, onroad_conditions["ignition"])
@@ -426,12 +492,6 @@ def thermald_thread():
         time.sleep(5)
         HARDWARE.shutdown()
 
-    # If UI has crashed, set the brightness to reasonable non-zero value
-    ui_running = "ui" in (p.name for p in sm["managerState"].processes if p.running)
-    if ui_running_prev and not ui_running:
-      HARDWARE.set_screen_brightness(20)
-    ui_running_prev = ui_running
-
     msg.deviceState.chargingError = current_filter.x > 0. and msg.deviceState.batteryPercent < 90  # if current is positive, then battery is being discharged
     msg.deviceState.started = started_ts is not None
     msg.deviceState.startedMonoTime = int(1e9*(started_ts or 0))
@@ -442,7 +502,9 @@ def thermald_thread():
 
     msg.deviceState.thermalStatus = thermal_status
     pm.send("deviceState", msg)
+
     if EON and not is_uno:
+      print(msg) # for charging disabled
       set_offroad_alert_if_changed("Offroad_ChargeDisabled", (not usb_power))
 
     should_start_prev = should_start
@@ -464,7 +526,27 @@ def thermald_thread():
 
 
 def main():
-  thermald_thread()
+  hw_queue = queue.Queue(maxsize=1)
+  end_event = threading.Event()
+
+  threads = [
+    threading.Thread(target=hw_state_thread, args=(end_event, hw_queue)),
+    threading.Thread(target=thermald_thread, args=(end_event, hw_queue)),
+  ]
+
+  for t in threads:
+    t.start()
+
+  try:
+    while True:
+      time.sleep(1)
+      if not all(t.is_alive() for t in threads):
+        break
+  finally:
+    end_event.set()
+
+  for t in threads:
+    t.join()
 
 
 if __name__ == "__main__":

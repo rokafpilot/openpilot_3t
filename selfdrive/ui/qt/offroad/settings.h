@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QStackedWidget>
 #include <QWidget>
+#include <QStackedLayout>
 
 
 #include "selfdrive/ui/qt/widgets/controls.h"
@@ -41,6 +42,7 @@ public:
 signals:
   void reviewTrainingGuide();
   void showDriverView();
+  void closeSettings();
 
 private slots:
   void poweroff();

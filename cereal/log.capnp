@@ -373,9 +373,9 @@ struct DeviceState @0xa4d8b5af2aa492eb {
   batDEPRECATED @6 :UInt32;
   pa0DEPRECATED @21 :UInt16;
   cpuUsagePercentDEPRECATED @20 :Int8;
-  batteryStatusDEPRECATED @9 :Text;
+  batteryStatus @9 :Text;
   batteryVoltageDEPRECATED @16 :Int32;
-  batteryTempCDEPRECATED @29 :Float32;
+  batteryTempC @29 :Float32;
 }
 
 struct PandaState @0xa7649e2575e4591e {
@@ -390,12 +390,14 @@ struct PandaState @0xa7649e2575e4591e {
   ignitionCan @13 :Bool;
   safetyModel @14 :Car.CarParams.SafetyModel;
   safetyParam @20 :Int16;
+  unsafeMode @23 :Int16;
   faultStatus @15 :FaultStatus;
   powerSaveEnabled @16 :Bool;
   uptime @17 :UInt32;
   faults @18 :List(FaultType);
   harnessStatus @21 :HarnessStatus;
   heartbeatLost @22 :Bool;
+  blockedCnt @24 :UInt32;
 
   enum FaultStatus {
     none @0;
@@ -826,6 +828,8 @@ struct LongitudinalPlan @0xe00b5b3eba12876c {
   speeds @33 :List(Float32);
   jerks @34 :List(Float32);
 
+  solverExecutionTime @35 :Float32;
+
   enum LongitudinalPlanSource {
     cruise @0;
     lead0 @1;
@@ -887,9 +891,10 @@ struct LateralPlan @0xe1e9318e2ae8b51e {
   curvatures @27 :List(Float32);
   curvatureRates @28 :List(Float32);
 
-  autoLaneChangeEnabled @30 :Bool;
-  autoLaneChangeTimer @31 :Int8;
-
+  solverExecutionTime @30 :Float32;
+  
+  autoLaneChangeEnabled @31 :Bool;
+  autoLaneChangeTimer @32 :Int8;
 
   enum Desire {
     none @0;
@@ -1326,6 +1331,7 @@ struct LiveParametersData {
   angleOffsetAverageStd @11 :Float32;
   stiffnessFactorStd @12 :Float32;
   steerRatioStd @13 :Float32;
+  roll @14 :Float32;
 }
 
 struct LiveMapDataDEPRECATED {
@@ -1498,6 +1504,7 @@ struct Event {
     clocks @35 :Clocks;
     deviceState @6 :DeviceState;
     logMessage @18 :Text;
+    errorLogMessage @85 :Text;
 
     # navigation
     navInstruction @82 :NavInstruction;
@@ -1505,7 +1512,7 @@ struct Event {
     navThumbnail @84: Thumbnail;
 
     # neokii
-    roadLimitSpeed @85 :RoadLimitSpeed;
+    roadLimitSpeed @86 :RoadLimitSpeed;
 
     # *********** debug ***********
     testJoystick @52 :Joystick;
