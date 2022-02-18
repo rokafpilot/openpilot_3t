@@ -24,7 +24,7 @@ def long_control_state_trans(CP, active, long_control_state, v_ego, v_target_fut
 
   # neokii
   if radarState is not None and radarState.leadOne is not None and radarState.leadOne.status:
-    starting_condition = starting_condition and ((radarState.leadOne.dRel > .2) or (radarState.leadOne.vLead > CP.vEgoStarting))
+    starting_condition = starting_condition and (radarState.leadOne.vLead > CP.vEgoStarting)
 
   if not active:
     long_control_state = LongCtrlState.off
@@ -84,7 +84,7 @@ class LongControl():
       a_target = 0.0
 
     if a_target > 0.:
-      a_target *= interp(CS.vEgo, [0., 4.], [1.6, 1.])
+      a_target *= interp(CS.vEgo, [0., 3.], [1.96, 1.])
 
     # TODO: This check is not complete and needs to be enforced by MPC
     a_target = clip(a_target, ACCEL_MIN_ISO, ACCEL_MAX_ISO)

@@ -6,6 +6,9 @@
 #include "selfdrive/ui/qt/widgets/cameraview.h"
 #include "selfdrive/ui/ui.h"
 
+#include <QTimer>
+#include "selfdrive/ui/qt/screenrecorder/screenrecorder.h"
+
 
 // ***** onroad widgets *****
 class OnroadHud : public QWidget {
@@ -103,15 +106,25 @@ public:
   OnroadWindow(QWidget* parent = 0);
   bool isMapVisible() const { return map && map->isVisible(); }
 
-private:
-  void paintEvent(QPaintEvent *event);
+protected:
   void mousePressEvent(QMouseEvent* e) override;
   OnroadHud *hud;
+  void mouseReleaseEvent(QMouseEvent* e) override;
+
+  void paintEvent(QPaintEvent *event) override;
+
+private:
   OnroadAlerts *alerts;
   NvgWindow *nvg;
   QColor bg = bg_colors[STATUS_DISENGAGED];
   QWidget *map = nullptr;
   QHBoxLayout* split;
+
+  // neokii
+private:
+  ScreenRecoder* recorder;
+  std::shared_ptr<QTimer> record_timer;
+  QPoint startPos;
 
 private slots:
   void offroadTransition(bool offroad);
