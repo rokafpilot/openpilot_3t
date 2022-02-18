@@ -72,6 +72,7 @@ typedef struct FrameMetadata {
 
   // Focus
   unsigned int lens_pos;
+  float lens_sag;
   float lens_err;
   float lens_true_pos;
 } FrameMetadata;
