@@ -66,6 +66,7 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   stacked_layout->addWidget(recorder_widget);
   recorder_widget->raise();
   alerts->raise();
+
 }
 
 void OnroadWindow::updateState(const UIState &s) {
@@ -74,6 +75,8 @@ void OnroadWindow::updateState(const UIState &s) {
   if (s.sm->updated("controlsState") || !alert.equal({})) {
     if (alert.type == "controlsUnresponsive") {
       bgColor = bg_colors[STATUS_ALERT];
+    } else if (alert.type == "controlsUnresponsivePermanent") {
+      bgColor = bg_colors[STATUS_DISENGAGED];
     }
     alerts->updateAlert(alert, bgColor);
   }
@@ -565,34 +568,6 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
       rect.adjust(-30, 0, 30, 0);
       p.setPen(QColor(255, 255, 255, 230));
       p.drawText(rect, Qt::AlignCenter, str_left_dist);
-    }
-  }
-  else {
-    auto controls_state = sm["controlsState"].getControlsState();
-    int sccStockCamAct = (int)controls_state.getSccStockCamAct();
-    int sccStockCamStatus = (int)controls_state.getSccStockCamStatus();
-
-    if(sccStockCamAct == 2 && sccStockCamStatus == 2) {
-      int radius_ = 192;
-
-      int x = 30;
-      int y = 270;
-
-      p.setPen(Qt::NoPen);
-
-      p.setBrush(QBrush(QColor(255, 0, 0, 255)));
-      QRect rect = QRect(x, y, radius_, radius_);
-      p.drawEllipse(rect);
-
-      p.setBrush(QBrush(QColor(255, 255, 255, 255)));
-
-      const int tickness = 14;
-      rect.adjust(tickness, tickness, -tickness, -tickness);
-      p.drawEllipse(rect);
-
-      configFont(p, "Open Sans", 70, "Bold");
-      p.setPen(QColor(0, 0, 0, 230));
-      p.drawText(rect, Qt::AlignCenter, "CAM");
     }
   }
 }
