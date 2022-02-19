@@ -182,6 +182,7 @@ env = Environment(
     "-g",
     "-fPIC",
     "-O2",
+    "-Wunused",
     "-Werror",
     "-Wshadow",
     "-Wno-implicit-function-declaration",

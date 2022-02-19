@@ -33,6 +33,7 @@ struct Alert {
   QString type;
   cereal::ControlsState::AlertSize size;
   AudibleAlert sound;
+
   bool equal(const Alert &a2) {
     return text1 == a2.text1 && text2 == a2.text2 && type == a2.type && sound == a2.sound;
   }
@@ -53,11 +54,17 @@ struct Alert {
         return {"openpilot Unavailable", "Waiting for controls to start",
                 "controlsWaiting", cereal::ControlsState::AlertSize::MID,
                 AudibleAlert::NONE};
-      } else if ((nanos_since_boot() - sm.rcv_time("controlsState")) / 1e9 > CONTROLS_TIMEOUT) {
+      } else if (controls_missing > CONTROLS_TIMEOUT) {
         // car is started, but controls is lagging or died
-        return {"TAKE CONTROL IMMEDIATELY", "Controls Unresponsive",
-                "controlsUnresponsive", cereal::ControlsState::AlertSize::FULL,
-                AudibleAlert::WARNING_IMMEDIATE};
+        if (cs.getEnabled() && (controls_missing - CONTROLS_TIMEOUT) < 10) {
+          return {"TAKE CONTROL IMMEDIATELY", "Controls Unresponsive",
+                  "controlsUnresponsive", cereal::ControlsState::AlertSize::FULL,
+                  AudibleAlert::WARNING_IMMEDIATE};
+        } else {
+          return {"Controls Unresponsive", "Reboot Device",
+                  "controlsUnresponsivePermanent", cereal::ControlsState::AlertSize::MID,
+                  AudibleAlert::NONE};
+        }
       }
     }
     return {};
@@ -85,8 +92,6 @@ typedef struct {
 
 typedef struct UIScene {
   mat3 view_from_calib;
-  bool world_objects_visible;
-
   cereal::PandaState::PandaType pandaType;
 
   // modelV2
@@ -98,6 +103,7 @@ typedef struct UIScene {
 
   // lead
   QPointF lead_vertices[2];
+  bool lead_radar[2] = {false, false};
 
   float light_sensor, accel_sensor, gyro_sensor;
   bool started, ignition, is_metric, longitudinal_control, end_to_end;
@@ -109,6 +115,13 @@ class UIState : public QObject {
 
 public:
   UIState(QObject* parent = 0);
+  void updateStatus();
+  inline bool worldObjectsVisible() const {
+    return sm->rcv_frame("liveCalibration") > scene.started_frame;
+  };
+  inline bool engaged() const {
+    return scene.started && (*sm)["controlsState"].getControlsState().getEnabled();
+  };
 
   int fb_w = 0, fb_h = 0;
 
@@ -123,6 +136,9 @@ public:
   QTransform car_space_transform;
   bool wide_camera;
 
+  bool recording = false;
+  bool show_debug = false;
+
 signals:
   void uiUpdate(const UIState &s);
   void offroadTransition(bool offroad);
@@ -132,7 +148,7 @@ private slots:
 
 private:
   QTimer *timer;
-  bool started_prev = true;
+  bool started_prev = false;
 };
 
 UIState *uiState();
