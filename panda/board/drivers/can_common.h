@@ -14,10 +14,6 @@ typedef struct {
   bool brs_enabled;
 } bus_config_t;
 
-#define CAN_BUS_NUM_MASK 0x3FU
-
-#define BUS_MAX 4U
-
 uint32_t can_rx_errs = 0;
 uint32_t can_send_errs = 0;
 uint32_t can_fwd_errs = 0;
@@ -203,11 +199,6 @@ void ignition_can_hook(CANPacket_t *to_push) {
     if ((addr == 0x160) && (len == 5)) {
       // this message isn't all zeros when ignition is on
       ignition_can = GET_BYTES_04(to_push) != 0U;
-    }
-    if ((addr == 0x1F1) && (len == 8)) {
-      // Bit 5 is ignition "on"
-      bool ignition_gm = ((GET_BYTE(to_push, 0) & 0x20U) != 0U);
-      ignition_can = ignition_gm;
     }
 
     // Tesla exception
