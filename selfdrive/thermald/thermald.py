@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 import datetime
 import os
+import queue
+import threading
 import time
+from collections import OrderedDict, namedtuple
 from pathlib import Path
 from typing import Dict, Optional, Tuple
-from collections import namedtuple, OrderedDict
 
 import psutil
 from smbus2 import SMBus
 
 import cereal.messaging as messaging
 from cereal import log
+from common.dict_helpers import strip_deprecated_keys
 from common.filter_simple import FirstOrderFilter
 from common.numpy_fast import interp
 from common.params import Params, ParamKeyType
 from common.realtime import DT_TRML, sec_since_boot
-#from common.dict_helpers import strip_deprecated_keys
 from selfdrive.controls.lib.alertmanager import set_offroad_alert
 from selfdrive.controls.lib.pid import PIController
 from selfdrive.hardware import EON, TICI, PC, HARDWARE
 from selfdrive.loggerd.config import get_available_percent
+from selfdrive.statsd import statlog
 from selfdrive.swaglog import cloudlog
 from selfdrive.thermald.power_monitoring import PowerMonitoring
 from selfdrive.version import terms_version, training_version
@@ -32,8 +35,10 @@ TEMP_TAU = 5.   # 5s time constant
 DAYS_NO_CONNECTIVITY_MAX = 14     # do not allow to engage after this many days
 DAYS_NO_CONNECTIVITY_PROMPT = 10  # send an offroad prompt after this many days
 DISCONNECT_TIMEOUT = 5.  # wait 5 seconds before going offroad after disconnect so you get an alert
+PANDA_STATES_TIMEOUT = int(1000 * 2.5 * DT_TRML)  # 2.5x the expected pandaState frequency
 
 ThermalBand = namedtuple("ThermalBand", ['min_temp', 'max_temp'])
+HardwareState = namedtuple("HardwareState", ['network_type', 'network_strength', 'network_info', 'nvme_temps', 'modem_temps', 'wifi_address'])
 
 # List of thermal bands. We will stay within this region as long as we are within the bounds.
 # When exiting the bounds, we'll jump to the lower or higher band. Bands are ordered in the dict.
@@ -101,15 +106,9 @@ def set_eon_fan(val):
       # tusb320
         if val == 0:
           bus.write_i2c_block_data(0x67, 0xa, [0])
-          #bus.write_i2c_block_data(0x67, 0x45, [1<<2])
         else:
-          #bus.write_i2c_block_data(0x67, 0x45, [0])
           bus.write_i2c_block_data(0x67, 0xa, [0x20])
           bus.write_i2c_block_data(0x67, 0x8, [(val - 1) << 6])
-    else:
-      bus.write_byte_data(0x21, 0x04, 0x2)
-      bus.write_byte_data(0x21, 0x03, (val*2)+1)
-      bus.write_byte_data(0x21, 0x04, 0x4)
     bus.close()
     last_eon_fan_val = val
 
@@ -158,7 +157,7 @@ def handle_fan_tici(controller, max_cpu_temp, fan_speed, ignition):
     controller.reset()
 
   fan_pwr_out = -int(controller.update(
-                     setpoint=(75 if ignition else (OFFROAD_DANGER_TEMP - 2)),
+                     setpoint=75,
                      measurement=max_cpu_temp,
                      feedforward=interp(max_cpu_temp, [60.0, 100.0], [0, -80])
                   ))
@@ -166,6 +165,21 @@ def handle_fan_tici(controller, max_cpu_temp, fan_speed, ignition):
   last_ignition = ignition
   return fan_pwr_out
 
+# from bellow line, to control charging disabled
+def check_car_battery_voltage(should_start, pandaStates, charging_disabled, msg):
+  sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "managerState"])
+  sm.update(0)
+  peripheralState = sm['peripheralState']
+  print(pandaStates)
+
+  if charging_disabled and msg.deviceState.batteryPercent < int(kegman_kans.conf['battChargeMin']):
+    charging_disabled = False
+    os.system('echo "1" > /sys/class/power_supply/battery/charging_enabled')
+  elif msg.deviceState.batteryPercent > int(kegman_kans.conf['battChargeMax']):
+    charging_disabled = True
+    os.system('echo "0" > /sys/class/power_supply/battery/charging_enabled')
+
+  return charging_disabled # to this line
 
 def set_offroad_alert_if_changed(offroad_alert: str, show_alert: bool, extra_text: Optional[str]=None):
   if prev_offroad_states.get(offroad_alert, None) == (show_alert, extra_text):
@@ -177,10 +191,7 @@ def set_offroad_alert_if_changed(offroad_alert: str, show_alert: bool, extra_tex
 def thermald_thread():
 
   pm = messaging.PubMaster(['deviceState'])
-
-  pandaState_timeout = int(1000 * 2.5 * DT_TRML)  # 2.5x the expected pandaState frequency
-  pandaState_sock = messaging.sub_sock('pandaStates', timeout=pandaState_timeout)
-  sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "managerState"])
+  sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "controlsState", "pandaStates"], poll=["pandaStates"])
 
   fan_speed = 0
   count = 0
@@ -332,6 +343,7 @@ def thermald_thread():
 
     msg.deviceState.screenBrightnessPercent = HARDWARE.get_screen_brightness()
     msg.deviceState.batteryPercent = HARDWARE.get_battery_capacity()
+    msg.deviceState.batteryStatus = HARDWARE.get_battery_status()
     msg.deviceState.batteryCurrent = HARDWARE.get_battery_current()
     msg.deviceState.usbOnline = HARDWARE.get_usb_present()
     current_filter.update(msg.deviceState.batteryCurrent / 1e6)

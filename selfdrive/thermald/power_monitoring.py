@@ -2,13 +2,16 @@ import random
 import threading
 import time
 from statistics import mean
+from typing import Optional
 
 from cereal import log
 from common.params import Params, put_nonblocking
 from common.realtime import sec_since_boot
 from selfdrive.hardware import HARDWARE
 from selfdrive.swaglog import cloudlog
+from selfdrive.statsd import statlog
 
+PANDA_OUTPUT_VOLTAGE = 5.28
 CAR_VOLTAGE_LOW_PASS_K = 0.091 # LPF gain for 5s tau (dt/tau / (dt/tau + 1))
 
 # A C2 uses about 1W while idling, and 30h seens like a good shutoff for most cars
@@ -16,10 +19,13 @@ CAR_VOLTAGE_LOW_PASS_K = 0.091 # LPF gain for 5s tau (dt/tau / (dt/tau + 1))
 CAR_BATTERY_CAPACITY_uWh = 30e6
 CAR_CHARGING_RATE_W = 45
 
-VBATT_PAUSE_CHARGING = 12.0           # Lower limit on the LPF car battery voltage
+VBATT_PAUSE_CHARGING = 11.0           # Lower limit on the LPF car battery voltage
 VBATT_INSTANT_PAUSE_CHARGING = 7.0    # Lower limit on the instant car battery voltage measurements to avoid triggering on instant power loss
 MAX_TIME_OFFROAD_S = 30*3600
 MIN_ON_TIME_S = 3600
+def panda_current_to_actual_current(panda_current):
+  # From white/grey panda schematic
+  return (3.3 - (panda_current * 3.3 / 4096)) / 8.25
 
 class PowerMonitoring:
   def __init__(self):
@@ -55,6 +61,7 @@ class PowerMonitoring:
       # Low-pass battery voltage
       self.car_voltage_instant_mV = peripheralState.voltage
       self.car_voltage_mV = ((peripheralState.voltage * CAR_VOLTAGE_LOW_PASS_K) + (self.car_voltage_mV * (1 - CAR_VOLTAGE_LOW_PASS_K)))
+      statlog.gauge("car_voltage", self.car_voltage_mV / 1e3)
 
       # Cap the car battery power and save it in a param every 10-ish seconds
       self.car_battery_capacity_uWh = max(self.car_battery_capacity_uWh, 0)
@@ -89,6 +96,11 @@ class PowerMonitoring:
           # If the battery is discharging, we can use this measurement
           # On C2: this is low by about 10-15%, probably mostly due to UNO draw not being factored in
           current_power = ((HARDWARE.get_battery_voltage() / 1000000) * (HARDWARE.get_battery_current() / 1000000))
+        elif (peripheralState.pandaType in [log.PandaState.PandaType.whitePanda, log.PandaState.PandaType.greyPanda]) and (peripheralState.current > 1):
+          # If white/grey panda, use the integrated current measurements if the measurement is not 0
+          # If the measurement is 0, the current is 400mA or greater, and out of the measurement range of the panda
+          # This seems to be accurate to about 5%
+          current_power = (PANDA_OUTPUT_VOLTAGE * panda_current_to_actual_current(peripheralState.current))
         elif (self.next_pulsed_measurement_time is not None) and (self.next_pulsed_measurement_time <= now):
           # TODO: Figure out why this is off by a factor of 3/4???
           FUDGE_FACTOR = 1.33
@@ -135,7 +147,7 @@ class PowerMonitoring:
     except Exception:
       cloudlog.exception("Power monitoring calculation failed")
 
-  def _perform_integration(self, t, current_power):
+  def _perform_integration(self, t: float, current_power: float) -> None:
     with self.integration_lock:
       try:
         if self.last_measurement_time:
@@ -150,14 +162,14 @@ class PowerMonitoring:
         cloudlog.exception("Integration failed")
 
   # Get the power usage
-  def get_power_used(self):
+  def get_power_used(self) -> int:
     return int(self.power_used_uWh)
 
-  def get_car_battery_capacity(self):
+  def get_car_battery_capacity(self) -> int:
     return int(self.car_battery_capacity_uWh)
 
   # See if we need to disable charging
-  def should_disable_charging(self, ignition, in_car, offroad_timestamp):
+  def should_disable_charging(self, ignition: bool, in_car: bool, offroad_timestamp: Optional[float]) -> bool:
     if offroad_timestamp is None:
       return False
 
@@ -179,11 +191,11 @@ class PowerMonitoring:
 
     now = sec_since_boot()
     panda_charging = (peripheralState.usbPowerMode != log.PeripheralState.UsbPowerMode.client)
-    BATT_PERC_OFF = 50
+    BATT_PERC_OFF = 10
 
     should_shutdown = False
     # Wait until we have shut down charging before powering down
     should_shutdown |= (not panda_charging and self.should_disable_charging(ignition, in_car, offroad_timestamp))
-    should_shutdown |= ((HARDWARE.get_battery_capacity() < BATT_PERC_OFF) and (not HARDWARE.get_battery_charging()) and ((now - offroad_timestamp) > 600))
+    should_shutdown |= ((HARDWARE.get_battery_capacity() < BATT_PERC_OFF) and (not HARDWARE.get_battery_charging()) and ((now - offroad_timestamp) > 60))
     should_shutdown &= started_seen or (now > MIN_ON_TIME_S)
     return should_shutdown
