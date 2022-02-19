@@ -1326,6 +1326,7 @@ struct LiveParametersData {
   angleOffsetAverageStd @11 :Float32;
   stiffnessFactorStd @12 :Float32;
   steerRatioStd @13 :Float32;
+  roll @14 :Float32;
 }
 
 struct LiveMapDataDEPRECATED {

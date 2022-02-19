@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
 import datetime
 import os
+import queue
+import threading
 import time
+from collections import OrderedDict, namedtuple
 from pathlib import Path
 from typing import Dict, Optional, Tuple
-from collections import namedtuple, OrderedDict
 
 import psutil
 from smbus2 import SMBus
 
 import cereal.messaging as messaging
 from cereal import log
+from common.dict_helpers import strip_deprecated_keys
 from common.filter_simple import FirstOrderFilter
 from common.numpy_fast import interp
 from common.params import Params, ParamKeyType
 from common.realtime import DT_TRML, sec_since_boot
-from common.dict_helpers import strip_deprecated_keys
 from selfdrive.controls.lib.alertmanager import set_offroad_alert
 from selfdrive.controls.lib.pid import PIController
-from selfdrive.hardware import EON, TICI, PC, HARDWARE
+from selfdrive.hardware import EON, HARDWARE, PC, TICI
 from selfdrive.loggerd.config import get_available_percent
 from selfdrive.swaglog import cloudlog
 from selfdrive.thermald.power_monitoring import PowerMonitoring
@@ -30,6 +32,7 @@ NetworkStrength = log.DeviceState.NetworkStrength
 CURRENT_TAU = 15.   # 15s time constant
 TEMP_TAU = 5.   # 5s time constant
 DISCONNECT_TIMEOUT = 5.  # wait 5 seconds before going offroad after disconnect so you get an alert
+PANDA_STATES_TIMEOUT = int(1000 * 2.5 * DT_TRML)  # 2.5x the expected pandaState frequency
 
 ThermalBand = namedtuple("ThermalBand", ['min_temp', 'max_temp'])
 HardwareState = namedtuple("HardwareState", ['network_type', 'network_strength', 'network_info', 'nvme_temps', 'modem_temps', 'wifi_address'])
@@ -176,19 +179,16 @@ def set_offroad_alert_if_changed(offroad_alert: str, show_alert: bool, extra_tex
 def thermald_thread():
 
   pm = messaging.PubMaster(['deviceState'])
-
-  pandaState_timeout = int(1000 * 2.5 * DT_TRML)  # 2.5x the expected pandaState frequency
-  pandaState_sock = messaging.sub_sock('pandaStates', timeout=pandaState_timeout)
-  sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "managerState"])
+  sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "controlsState", "pandaStates"], poll=["pandaStates"])
 
   fan_speed = 0
   count = 0
 
-  onroad_conditions = {
+  onroad_conditions: Dict[str, bool] = {
     "ignition": False,
   }
-  startup_conditions = {}
-  startup_conditions_prev = {}
+  startup_conditions: Dict[str, bool] = {}
+  startup_conditions_prev: Dict[str, bool] = {}
 
   off_ts = None
   started_ts = None
@@ -350,7 +350,7 @@ def thermald_thread():
     # Ensure date/time are valid
     now = datetime.datetime.utcnow()
     startup_conditions["time_valid"] = True #(now.year > 2020) or (now.year == 2020 and now.month >= 10)
-    #set_offroad_alert_if_changed("Offroad_InvalidTime", (not startup_conditions["time_valid"]))
+    set_offroad_alert_if_changed("Offroad_InvalidTime", (not startup_conditions["time_valid"]))
 
     startup_conditions["up_to_date"] = True #params.get("Offroad_ConnectivityNeeded") is None or params.get_bool("DisableUpdates") or params.get_bool("SnoozeUpdate")
     startup_conditions["not_uninstalling"] = not params.get_bool("DoUninstall")
@@ -379,7 +379,22 @@ def thermald_thread():
     if should_start != should_start_prev or (count == 0):
       params.put_bool("IsOnroad", should_start)
       params.put_bool("IsOffroad", not should_start)
+
+      params.put_bool("IsEngaged", False)
+      engaged_prev = False
       HARDWARE.set_power_save(not should_start)
+
+    if sm.updated['controlsState']:
+      engaged = sm['controlsState'].enabled
+      if engaged != engaged_prev:
+        params.put_bool("IsEngaged", engaged)
+        engaged_prev = engaged
+
+      try:
+        with open('/dev/kmsg', 'w') as kmsg:
+          kmsg.write(f"<3>[thermald] engaged: {engaged}\n")
+      except Exception:
+        pass
 
     if should_start:
       off_ts = None

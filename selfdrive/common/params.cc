@@ -85,15 +85,14 @@ private:
 std::unordered_map<std::string, uint32_t> keys = {
     {"AccessToken", CLEAR_ON_MANAGER_START | DONT_LOG},
     {"AthenadPid", PERSISTENT},
-    {"BootedOnroad", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_OFF},
+    {"AthenadUploadQueue", PERSISTENT},
     {"CalibrationParams", PERSISTENT},
     {"CarBatteryCapacity", PERSISTENT},
-    {"CarParams", CLEAR_ON_MANAGER_START | CLEAR_ON_PANDA_DISCONNECT | CLEAR_ON_IGNITION_ON},
-    {"CarParamsCache", CLEAR_ON_MANAGER_START | CLEAR_ON_PANDA_DISCONNECT},
-    {"CarVin", CLEAR_ON_MANAGER_START | CLEAR_ON_PANDA_DISCONNECT | CLEAR_ON_IGNITION_ON},
-    {"CommunityFeaturesToggle", PERSISTENT},
+    {"CarParams", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
+    {"CarParamsCache", CLEAR_ON_MANAGER_START},
+    {"CarVin", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
     {"CompletedTrainingVersion", PERSISTENT},
-    {"ControlsReady", CLEAR_ON_MANAGER_START | CLEAR_ON_PANDA_DISCONNECT | CLEAR_ON_IGNITION_ON},
+    {"ControlsReady", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
     {"CurrentRoute", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
     {"DisablePowerDown", PERSISTENT},
     {"DisableRadar_Allow", PERSISTENT},
@@ -120,6 +119,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"IMEI", PERSISTENT},
     {"InstallDate", PERSISTENT},
     {"IsDriverViewEnabled", CLEAR_ON_MANAGER_START},
+    {"IsEngaged", PERSISTENT},
     {"IsLdwEnabled", PERSISTENT},
     {"IsMetric", PERSISTENT},
     {"IsOffroad", CLEAR_ON_MANAGER_START},
@@ -139,6 +139,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"NavdRender", PERSISTENT},
     {"OpenpilotEnabledToggle", PERSISTENT},
     {"PandaHeartbeatLost", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_OFF},
+    {"PandaSignatures", CLEAR_ON_MANAGER_START},
     {"Passive", PERSISTENT},
     {"PrimeRedirected", PERSISTENT},
     {"RecordFront", PERSISTENT},
@@ -160,7 +161,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"ApiCache_NavDestinations", PERSISTENT},
     {"ApiCache_Owner", PERSISTENT},
     {"Offroad_CarUnrecognized", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
-    {"Offroad_ChargeDisabled", CLEAR_ON_MANAGER_START | CLEAR_ON_PANDA_DISCONNECT},
+    {"Offroad_ChargeDisabled", CLEAR_ON_MANAGER_START },
     {"Offroad_ConnectivityNeeded", CLEAR_ON_MANAGER_START},
     {"Offroad_ConnectivityNeededPrompt", CLEAR_ON_MANAGER_START},
     {"Offroad_InvalidTime", CLEAR_ON_MANAGER_START},
@@ -180,6 +181,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"ShowBattLevelUI", PERSISTENT},
 
 
+    {"SoftRestartTriggered", CLEAR_ON_MANAGER_START},
 };
 
 } // namespace

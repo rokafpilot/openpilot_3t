@@ -26,6 +26,12 @@
 #include "selfdrive/ui/qt/util.h"
 #include "selfdrive/ui/qt/qt_window.h"
 
+#include <QComboBox>
+#include <QAbstractItemView>
+#include <QScroller>
+#include <QListView>
+#include <QListWidget>
+
 TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
   // param, title, desc, icon
   std::vector<std::tuple<QString, QString, QString, QString>> toggles{
@@ -38,7 +44,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
     {
       "IsLdwEnabled",
       "Enable Lane Departure Warnings",
-      "Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line without a turn signal activated while driving over 31mph (50kph).",
+      "Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line without a turn signal activated while driving over 31 mph (50 km/h).",
       "../assets/offroad/icon_warning.png",
     },
     {
@@ -97,9 +103,9 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
     auto toggle = new ParamControl(param, title, desc, icon, this);
     bool locked = params.getBool((param + "Lock").toStdString());
     toggle->setEnabled(!locked);
-    if (!locked) {
-      connect(uiState(), &UIState::offroadTransition, toggle, &ParamControl::setEnabled);
-    }
+    //if (!locked) {
+    //  connect(uiState(), &UIState::offroadTransition, toggle, &ParamControl::setEnabled);
+    //}
     addItem(toggle);
   }
 }
@@ -108,6 +114,37 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   setSpacing(50);
   addItem(new LabelControl("Dongle ID", getDongleId().value_or("N/A")));
   addItem(new LabelControl("Serial", params.get("HardwareSerial").c_str()));
+
+  QHBoxLayout *reset_layout = new QHBoxLayout();
+  reset_layout->setSpacing(30);
+
+  // reset calibration button
+  QPushButton *restart_openpilot_btn = new QPushButton("Soft restart");
+  restart_openpilot_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
+  reset_layout->addWidget(restart_openpilot_btn);
+  QObject::connect(restart_openpilot_btn, &QPushButton::released, [=]() {
+    emit closeSettings();
+    QTimer::singleShot(1000, []() {
+      Params().putBool("SoftRestartTriggered", true);
+    });
+  });
+
+  // reset calibration button
+  QPushButton *reset_calib_btn = new QPushButton("Reset Calibration");
+  reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
+  reset_layout->addWidget(reset_calib_btn);
+  QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
+    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration and live params?", this)) {
+      Params().remove("CalibrationParams");
+      Params().remove("LiveParameters");
+      emit closeSettings();
+      QTimer::singleShot(1000, []() {
+        Params().putBool("SoftRestartTriggered", true);
+      });
+    }
+  });
+
+  addItem(reset_layout);
 
   // offroad-only buttons
 
@@ -144,11 +181,11 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     addItem(regulatoryBtn);
   }
 
-  QObject::connect(uiState(), &UIState::offroadTransition, [=](bool offroad) {
+  /*QObject::connect(uiState(), &UIState::offroadTransition, [=](bool offroad) {
     for (auto btn : findChildren<ButtonControl *>()) {
       btn->setEnabled(offroad);
     }
-  });
+  });*/
 
   // power buttons
   QHBoxLayout *power_layout = new QHBoxLayout();
@@ -176,7 +213,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
 void DevicePanel::updateCalibDescription() {
   QString desc =
       "openpilot requires the device to be mounted within 4° left or right and "
-      "within 5° up or down. openpilot is continuously calibrating, resetting is rarely required.";
+      "within 5° up or 8° down. openpilot is continuously calibrating, resetting is rarely required.";
   std::string calib_bytes = Params().get("CalibrationParams");
   if (!calib_bytes.empty()) {
     try {
@@ -198,10 +235,10 @@ void DevicePanel::updateCalibDescription() {
 }
 
 void DevicePanel::reboot() {
-  if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
+  if (!uiState()->engaged()) {
     if (ConfirmationDialog::confirm("Are you sure you want to reboot?", this)) {
       // Check engaged again in case it changed while the dialog was open
-      if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
+      if (!uiState()->engaged()) {
         Params().putBool("DoReboot", true);
       }
     }
@@ -211,10 +248,10 @@ void DevicePanel::reboot() {
 }
 
 void DevicePanel::poweroff() {
-  if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
+  if (!uiState()->engaged()) {
     if (ConfirmationDialog::confirm("Are you sure you want to power off?", this)) {
       // Check engaged again in case it changed while the dialog was open
-      if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
+      if (!uiState()->engaged()) {
         Params().putBool("DoShutdown", true);
       }
     }
@@ -339,6 +376,26 @@ QWidget *network_panel(QWidget *parent) {
 #endif
 }
 
+static QStringList get_list(const char* path)
+{
+  QStringList stringList;
+  QFile textFile(path);
+  if(textFile.open(QIODevice::ReadOnly))
+  {
+      QTextStream textStream(&textFile);
+      while (true)
+      {
+        QString line = textStream.readLine();
+        if (line.isNull())
+            break;
+        else
+            stringList.append(line);
+      }
+  }
+
+  return stringList;
+}
+
 void SettingsWindow::showEvent(QShowEvent *event) {
   panel_widget->setCurrentIndex(0);
   nav_btns->buttons()[0]->setChecked(true);
@@ -357,30 +414,33 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   )");
 
   // close button
-  QPushButton *close_btn = new QPushButton("×");
+  QPushButton *close_btn = new QPushButton("← Back");
   close_btn->setStyleSheet(R"(
     QPushButton {
-      font-size: 140px;
-      padding-bottom: 20px;
+      font-size: 50px;
       font-weight: bold;
-      border 1px grey solid;
-      border-radius: 100px;
-      background-color: #292929;
-      font-weight: 400;
+      margin: 0px;
+      padding: 15px;
+      border-width: 0;
+      border-radius: 30px;
+      color: #dddddd;
+      background-color: #444444;
     }
     QPushButton:pressed {
       background-color: #3B3B3B;
     }
   )");
-  close_btn->setFixedSize(200, 200);
-  sidebar_layout->addSpacing(45);
-  sidebar_layout->addWidget(close_btn, 0, Qt::AlignCenter);
+  close_btn->setFixedSize(300, 110);
+  sidebar_layout->addSpacing(10);
+  sidebar_layout->addWidget(close_btn, 0, Qt::AlignRight);
+  sidebar_layout->addSpacing(10);
   QObject::connect(close_btn, &QPushButton::clicked, this, &SettingsWindow::closeSettings);
 
   // setup panels
   DevicePanel *device = new DevicePanel(this);
   QObject::connect(device, &DevicePanel::reviewTrainingGuide, this, &SettingsWindow::reviewTrainingGuide);
   QObject::connect(device, &DevicePanel::showDriverView, this, &SettingsWindow::showDriverView);
+  QObject::connect(device, &DevicePanel::closeSettings, this, &SettingsWindow::closeSettings);
 
   QList<QPair<QString, QWidget *>> panels = {
     {"Device", device},
@@ -407,7 +467,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
         color: grey;
         border: none;
         background: none;
-        font-size: 65px;
+        font-size: 60px;
         font-weight: 500;
         padding-top: %1px;
         padding-bottom: %1px;
@@ -458,4 +518,47 @@ void SettingsWindow::hideEvent(QHideEvent *event) {
 #ifdef QCOM
   HardwareEon::close_activities();
 #endif
+}
+  // Back button
+  QPushButton* back = new QPushButton("Back");
+  back->setObjectName("back_btn");
+  back->setFixedSize(500, 100);
+  connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
+  main_layout->addWidget(back, 0, Qt::AlignLeft);
+
+  QListWidget* list = new QListWidget(this);
+  list->setStyleSheet("QListView {padding: 40px; background-color: #393939; border-radius: 15px; height: 140px;} QListView::item{height: 100px}");
+  //list->setAttribute(Qt::WA_AcceptTouchEvents, true);
+  QScroller::grabGesture(list->viewport(), QScroller::LeftMouseButtonGesture);
+  list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+
+  list->addItem("[ Not selected ]");
+
+  QStringList items = get_list("/data/params/d/SupportedCars");
+  list->addItems(items);
+  list->setCurrentRow(0);
+
+  QString selected = QString::fromStdString(Params().get("SelectedCar"));
+
+  int index = 0;
+  for(QString item : items) {
+    if(selected == item) {
+        list->setCurrentRow(index + 1);
+        break;
+    }
+    index++;
+  }
+
+  QObject::connect(list, QOverload<QListWidgetItem*>::of(&QListWidget::itemClicked),
+    [=](QListWidgetItem* item){
+
+    if(list->currentRow() == 0)
+        Params().remove("SelectedCar");
+    else
+        Params().put("SelectedCar", list->currentItem()->text().toStdString());
+
+    emit selectedCar();
+    });
+
+  main_layout->addWidget(list);
 }
