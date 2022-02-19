@@ -234,9 +234,9 @@ void cameras_init(VisionIpcServer *v, MultiCameraState *s, cl_device_id device_i
     LOGD("LePro 3 op system detected");
     s->device = DEVICE_LP3;
 
-    // sensor is flipped in LP3
-    // IMAGE_ORIENT = 3
-    init_array_imx298[0].reg_data = 3;
+  // sensor is flipped in LP3
+  // IMAGE_ORIENT = 3
+  init_array_imx298[0].reg_data = 3;
     cameras_supported[CAMERA_ID_IMX298].bayer_flip = 3;
   } else if (strcmp(product_name, "OnePlus3") == 0 && strcmp(project_name, "15811") != 0) {
     // no more OP3 support
@@ -278,10 +278,10 @@ void cameras_init(VisionIpcServer *v, MultiCameraState *s, cl_device_id device_i
                 VISION_STREAM_RGB_FRONT, VISION_STREAM_DRIVER);
     s->driver_cam.apply_exposure = imx179_s5k3p8sp_apply_exposure;
   } else if (s->device == DEVICE_LP3) {
-    camera_init(v, &s->driver_cam, CAMERA_ID_OV8865, 1,
-                /*pixel_clock=*/72000000, /*line_length_pclk=*/1602,
-                /*max_gain=*/510, 10, device_id, ctx,
-                VISION_STREAM_RGB_FRONT, VISION_STREAM_DRIVER);
+  camera_init(v, &s->driver_cam, CAMERA_ID_OV8865, 1,
+              /*pixel_clock=*/72000000, /*line_length_pclk=*/1602,
+              /*max_gain=*/510, 10, device_id, ctx,
+              VISION_STREAM_RGB_FRONT, VISION_STREAM_DRIVER);
     s->driver_cam.apply_exposure = ov8865_apply_exposure;
   } else {
     camera_init(v, &s->driver_cam, CAMERA_ID_IMX179, 1,
@@ -338,7 +338,7 @@ static void set_exposure(CameraState *s, float exposure_frac, float gain_frac) {
       gain = 800 * gain_frac; // ISO
       err = s->apply_exposure(s, gain, integ_lines, s->frame_length);
     } else if (s->apply_exposure) {
-      err = s->apply_exposure(s, gain, integ_lines, s->frame_length);
+    err = s->apply_exposure(s, gain, integ_lines, s->frame_length);
     }
     if (err == 0) {
       std::lock_guard lk(s->frame_info_lock);
@@ -500,40 +500,40 @@ static void sensors_init(MultiCameraState *s) {
   struct msm_camera_sensor_slave_info slave_info = {0};
   if (s->device == DEVICE_LP3) {
     slave_info = (struct msm_camera_sensor_slave_info){
-      .sensor_name = "imx298",
-      .eeprom_name = "sony_imx298",
-      .actuator_name = "dw9800w",
-      .ois_name = "",
-      .flash_name = "pmic",
-      .camera_id = CAMERA_0,
-      .slave_addr = 32,
-      .i2c_freq_mode = I2C_FAST_MODE,
-      .addr_type = MSM_CAMERA_I2C_WORD_ADDR,
-      .sensor_id_info = {.sensor_id_reg_addr = 22, .sensor_id = 664, .module_id = 9, .vcm_id = 6},
-      .power_setting_array = {
-        .power_setting_a = {
-          {.seq_type = SENSOR_GPIO, .delay = 1},
-          {.seq_type = SENSOR_VREG, .seq_val = 2},
-          {.seq_type = SENSOR_GPIO, .seq_val = 5, .config_val = 2},
-          {.seq_type = SENSOR_VREG, .seq_val = 1},
-          {.seq_type = SENSOR_VREG, .seq_val = 3, .delay = 1},
-          {.seq_type = SENSOR_CLK, .config_val = 24000000, .delay = 1},
-          {.seq_type = SENSOR_GPIO, .config_val = 2, .delay = 10},
-        },
-        .size = 7,
-        .power_down_setting_a = {
-          {.seq_type = SENSOR_CLK, .delay = 1},
-          {.seq_type = SENSOR_GPIO, .delay = 1},
-          {.seq_type = SENSOR_VREG, .seq_val = 1},
-          {.seq_type = SENSOR_GPIO, .seq_val = 5},
-          {.seq_type = SENSOR_VREG, .seq_val = 2},
-          {.seq_type = SENSOR_VREG, .seq_val = 3, .delay = 1},
-        },
-        .size_down = 6,
+    .sensor_name = "imx298",
+    .eeprom_name = "sony_imx298",
+    .actuator_name = "dw9800w",
+    .ois_name = "",
+    .flash_name = "pmic",
+    .camera_id = CAMERA_0,
+    .slave_addr = 32,
+    .i2c_freq_mode = I2C_FAST_MODE,
+    .addr_type = MSM_CAMERA_I2C_WORD_ADDR,
+    .sensor_id_info = {.sensor_id_reg_addr = 22, .sensor_id = 664, .module_id = 9, .vcm_id = 6},
+    .power_setting_array = {
+      .power_setting_a = {
+        {.seq_type = SENSOR_GPIO, .delay = 1},
+        {.seq_type = SENSOR_VREG, .seq_val = 2},
+        {.seq_type = SENSOR_GPIO, .seq_val = 5, .config_val = 2},
+        {.seq_type = SENSOR_VREG, .seq_val = 1},
+        {.seq_type = SENSOR_VREG, .seq_val = 3, .delay = 1},
+        {.seq_type = SENSOR_CLK, .config_val = 24000000, .delay = 1},
+        {.seq_type = SENSOR_GPIO, .config_val = 2, .delay = 10},
       },
-      .is_init_params_valid = 0,
-      .sensor_init_params = {.modes_supported = 1, .position = BACK_CAMERA_B, .sensor_mount_angle = 90},
-      .output_format = MSM_SENSOR_BAYER,
+      .size = 7,
+      .power_down_setting_a = {
+        {.seq_type = SENSOR_CLK, .delay = 1},
+        {.seq_type = SENSOR_GPIO, .delay = 1},
+        {.seq_type = SENSOR_VREG, .seq_val = 1},
+        {.seq_type = SENSOR_GPIO, .seq_val = 5},
+        {.seq_type = SENSOR_VREG, .seq_val = 2},
+        {.seq_type = SENSOR_VREG, .seq_val = 3, .delay = 1},
+      },
+      .size_down = 6,
+    },
+    .is_init_params_valid = 0,
+    .sensor_init_params = {.modes_supported = 1, .position = BACK_CAMERA_B, .sensor_mount_angle = 90},
+    .output_format = MSM_SENSOR_BAYER,
     };
   } else {
     slave_info = (struct msm_camera_sensor_slave_info){
@@ -568,7 +568,7 @@ static void sensors_init(MultiCameraState *s) {
           {.seq_type = SENSOR_VREG, .seq_val = 1},
           {.seq_type = SENSOR_VREG},
           {.seq_type = SENSOR_VREG, .seq_val = 2},
-        },
+  },
         .size_down = 8,
       },
       .is_init_params_valid = 0,
@@ -587,38 +587,38 @@ static void sensors_init(MultiCameraState *s) {
   struct msm_camera_sensor_slave_info slave_info2 = {0};
   if (s->device == DEVICE_LP3) {
     slave_info2 = (struct msm_camera_sensor_slave_info){
-      .sensor_name = "ov8865_sunny",
-      .eeprom_name = "ov8865_plus",
-      .actuator_name = "",
-      .ois_name = "",
-      .flash_name = "",
-      .camera_id = CAMERA_2,
-      .slave_addr = 108,
-      .i2c_freq_mode = I2C_FAST_MODE,
-      .addr_type = MSM_CAMERA_I2C_WORD_ADDR,
-      .sensor_id_info = {.sensor_id_reg_addr = 12299, .sensor_id = 34917, .module_id = 2},
-      .power_setting_array = {
-        .power_setting_a = {
-          {.seq_type = SENSOR_GPIO, .delay = 5},
-          {.seq_type = SENSOR_VREG, .seq_val = 1},
-          {.seq_type = SENSOR_VREG, .seq_val = 2},
-          {.seq_type = SENSOR_VREG},
-          {.seq_type = SENSOR_CLK, .config_val = 24000000, .delay = 1},
-          {.seq_type = SENSOR_GPIO, .config_val = 2, .delay = 1},
-        },
-        .size = 6,
-        .power_down_setting_a = {
-          {.seq_type = SENSOR_GPIO, .delay = 5},
-          {.seq_type = SENSOR_CLK, .delay = 1},
-          {.seq_type = SENSOR_VREG},
-          {.seq_type = SENSOR_VREG, .seq_val = 1},
-          {.seq_type = SENSOR_VREG, .seq_val = 2, .delay = 1},
-        },
-        .size_down = 5,
+    .sensor_name = "ov8865_sunny",
+    .eeprom_name = "ov8865_plus",
+    .actuator_name = "",
+    .ois_name = "",
+    .flash_name = "",
+    .camera_id = CAMERA_2,
+    .slave_addr = 108,
+    .i2c_freq_mode = I2C_FAST_MODE,
+    .addr_type = MSM_CAMERA_I2C_WORD_ADDR,
+    .sensor_id_info = {.sensor_id_reg_addr = 12299, .sensor_id = 34917, .module_id = 2},
+    .power_setting_array = {
+      .power_setting_a = {
+        {.seq_type = SENSOR_GPIO, .delay = 5},
+        {.seq_type = SENSOR_VREG, .seq_val = 1},
+        {.seq_type = SENSOR_VREG, .seq_val = 2},
+        {.seq_type = SENSOR_VREG},
+        {.seq_type = SENSOR_CLK, .config_val = 24000000, .delay = 1},
+        {.seq_type = SENSOR_GPIO, .config_val = 2, .delay = 1},
       },
-      .is_init_params_valid = 0,
-      .sensor_init_params = {.modes_supported = 1, .position = FRONT_CAMERA_B, .sensor_mount_angle = 270},
-      .output_format = MSM_SENSOR_BAYER,
+      .size = 6,
+      .power_down_setting_a = {
+        {.seq_type = SENSOR_GPIO, .delay = 5},
+        {.seq_type = SENSOR_CLK, .delay = 1},
+        {.seq_type = SENSOR_VREG},
+        {.seq_type = SENSOR_VREG, .seq_val = 1},
+        {.seq_type = SENSOR_VREG, .seq_val = 2, .delay = 1},
+      },
+      .size_down = 5,
+    },
+    .is_init_params_valid = 0,
+    .sensor_init_params = {.modes_supported = 1, .position = FRONT_CAMERA_B, .sensor_mount_angle = 270},
+    .output_format = MSM_SENSOR_BAYER,
     };
   } else if (s->driver_cam.camera_id == CAMERA_ID_S5K3P8SP) {
     // init driver camera
@@ -697,8 +697,8 @@ static void sensors_init(MultiCameraState *s) {
   sensor_init_cfg.cfgtype = CFG_SINIT_PROBE;
   sensor_init_cfg.cfg.setting = &slave_info2;
   err = cam_ioctl(sensorinit_fd, VIDIOC_MSM_SENSOR_INIT_CFG, &sensor_init_cfg, "sensor init cfg (driver)");
-  assert(err >= 0);
-}
+    assert(err >= 0);
+  }
 
 static void camera_open(CameraState *s, bool is_road_cam) {
   int err;
@@ -717,12 +717,12 @@ static void camera_open(CameraState *s, bool is_road_cam) {
     s->csiphy_fd = HANDLE_EINTR(open("/dev/v4l-subdev0", O_RDWR | O_NONBLOCK));
     assert(s->csiphy_fd >= 0);
     if (s->device == DEVICE_LP3) {
-      sensor_dev = "/dev/v4l-subdev17";
+    sensor_dev = "/dev/v4l-subdev17";
     } else {
       sensor_dev = "/dev/v4l-subdev18";
     }
     if (s->device == DEVICE_LP3) {
-      s->isp_fd = HANDLE_EINTR(open("/dev/v4l-subdev13", O_RDWR | O_NONBLOCK));
+    s->isp_fd = HANDLE_EINTR(open("/dev/v4l-subdev13", O_RDWR | O_NONBLOCK));
     } else {
       s->isp_fd = HANDLE_EINTR(open("/dev/v4l-subdev14", O_RDWR | O_NONBLOCK));
     }
@@ -743,7 +743,7 @@ static void camera_open(CameraState *s, bool is_road_cam) {
     s->csiphy_fd = HANDLE_EINTR(open("/dev/v4l-subdev2", O_RDWR | O_NONBLOCK));
     assert(s->csiphy_fd >= 0);
     if (s->device == DEVICE_LP3) {
-      sensor_dev = "/dev/v4l-subdev18";
+    sensor_dev = "/dev/v4l-subdev18";
     } else {
       sensor_dev = "/dev/v4l-subdev19";
     }
@@ -849,7 +849,7 @@ static void camera_open(CameraState *s, bool is_road_cam) {
   // SENSOR: send i2c configuration
   if (s->camera_id == CAMERA_ID_IMX298) {
     err = sensor_write_regs(s, init_array_imx298, std::size(init_array_imx298), MSM_CAMERA_I2C_BYTE_DATA);
-  } else if  (s->camera_id == CAMERA_ID_S5K3P8SP) {
+  } else if (s->camera_id == CAMERA_ID_S5K3P8SP) {
     err = sensor_write_regs(s, init_array_s5k3p8sp, std::size(init_array_s5k3p8sp), MSM_CAMERA_I2C_WORD_DATA);
   } else if (s->camera_id == CAMERA_ID_IMX179) {
     err = sensor_write_regs(s, init_array_imx179, std::size(init_array_imx179), MSM_CAMERA_I2C_BYTE_DATA);
@@ -948,59 +948,58 @@ static void camera_open(CameraState *s, bool is_road_cam) {
       // from sniff
       s->infinity_dac = 364;
 
-      struct msm_actuator_reg_params_t actuator_reg_params[] = {
-        {
-          .reg_write_type = MSM_ACTUATOR_WRITE_DAC,
-          // MSB here at address 3
-          .reg_addr = 3,
-          .data_type = 9,
-          .addr_type = 4,
-        },
-      };
+    struct msm_actuator_reg_params_t actuator_reg_params[] = {
+      {
+        .reg_write_type = MSM_ACTUATOR_WRITE_DAC,
+        // MSB here at address 3
+        .reg_addr = 3,
+        .data_type = 9,
+        .addr_type = 4,
+      },
+    };
 
-      struct reg_settings_t actuator_init_settings[] = {
-        { .reg_addr=2, .addr_type=MSM_ACTUATOR_BYTE_ADDR, .reg_data=1, .data_type = MSM_ACTUATOR_BYTE_DATA, .i2c_operation = MSM_ACT_WRITE, .delay = 0 },   // PD = power down
-        { .reg_addr=2, .addr_type=MSM_ACTUATOR_BYTE_ADDR, .reg_data=0, .data_type = MSM_ACTUATOR_BYTE_DATA, .i2c_operation = MSM_ACT_WRITE, .delay = 2 },   // 0 = power up
-        { .reg_addr=2, .addr_type=MSM_ACTUATOR_BYTE_ADDR, .reg_data=2, .data_type = MSM_ACTUATOR_BYTE_DATA, .i2c_operation = MSM_ACT_WRITE, .delay = 2 },   // RING = SAC mode
-        { .reg_addr=6, .addr_type=MSM_ACTUATOR_BYTE_ADDR, .reg_data=64, .data_type = MSM_ACTUATOR_BYTE_DATA, .i2c_operation = MSM_ACT_WRITE, .delay = 0 },  // 0x40 = SAC3 mode
-        { .reg_addr=7, .addr_type=MSM_ACTUATOR_BYTE_ADDR, .reg_data=113, .data_type = MSM_ACTUATOR_BYTE_DATA, .i2c_operation = MSM_ACT_WRITE, .delay = 0 },
-        // 0x71 = DIV1 | DIV0 | SACT0 -- Tvib x 1/4 (quarter)
-        // SAC Tvib = 6.3 ms + 0.1 ms = 6.4 ms / 4 = 1.6 ms
-        // LSC 1-step = 252 + 1*4 = 256 ms / 4 = 64 ms
-      };
+    struct reg_settings_t actuator_init_settings[] = {
+      { .reg_addr=2, .addr_type=MSM_ACTUATOR_BYTE_ADDR, .reg_data=1, .data_type = MSM_ACTUATOR_BYTE_DATA, .i2c_operation = MSM_ACT_WRITE, .delay = 0 },   // PD = power down
+      { .reg_addr=2, .addr_type=MSM_ACTUATOR_BYTE_ADDR, .reg_data=0, .data_type = MSM_ACTUATOR_BYTE_DATA, .i2c_operation = MSM_ACT_WRITE, .delay = 2 },   // 0 = power up
+      { .reg_addr=2, .addr_type=MSM_ACTUATOR_BYTE_ADDR, .reg_data=2, .data_type = MSM_ACTUATOR_BYTE_DATA, .i2c_operation = MSM_ACT_WRITE, .delay = 2 },   // RING = SAC mode
+      { .reg_addr=6, .addr_type=MSM_ACTUATOR_BYTE_ADDR, .reg_data=64, .data_type = MSM_ACTUATOR_BYTE_DATA, .i2c_operation = MSM_ACT_WRITE, .delay = 0 },  // 0x40 = SAC3 mode
+      { .reg_addr=7, .addr_type=MSM_ACTUATOR_BYTE_ADDR, .reg_data=113, .data_type = MSM_ACTUATOR_BYTE_DATA, .i2c_operation = MSM_ACT_WRITE, .delay = 0 },
+      // 0x71 = DIV1 | DIV0 | SACT0 -- Tvib x 1/4 (quarter)
+      // SAC Tvib = 6.3 ms + 0.1 ms = 6.4 ms / 4 = 1.6 ms
+      // LSC 1-step = 252 + 1*4 = 256 ms / 4 = 64 ms
+    };
 
-      struct region_params_t region_params[] = {
-        {.step_bound = {238, 0,}, .code_per_step = 235, .qvalue = 128}
-      };
+    struct region_params_t region_params[] = {
+      {.step_bound = {238, 0,}, .code_per_step = 235, .qvalue = 128}
+    };
 
-      actuator_cfg_data.cfgtype = CFG_SET_ACTUATOR_INFO;
-      actuator_cfg_data.cfg.set_info = (struct msm_actuator_set_info_t){
-        .actuator_params = {
-          .act_type = ACTUATOR_BIVCM,
-          .reg_tbl_size = 1,
-          .data_size = 10,
-          .init_setting_size = 5,
-          .i2c_freq_mode = I2C_STANDARD_MODE,
-          .i2c_addr = 24,
-          .i2c_addr_type = MSM_ACTUATOR_BYTE_ADDR,
-          .i2c_data_type = MSM_ACTUATOR_WORD_DATA,
-          .reg_tbl_params = &actuator_reg_params[0],
-          .init_settings = &actuator_init_settings[0],
-          .park_lens = {.damping_step = 1023, .damping_delay = 14000, .hw_params = 11, .max_step = 20},
-        },
-        .af_tuning_params = {
-          .initial_code = (int16_t)s->infinity_dac,
-          .pwd_step = 0,
-          .region_size = 1,
-          .total_steps = 238,
-          .region_params = &region_params[0],
-        },
-      };
+    actuator_cfg_data.cfgtype = CFG_SET_ACTUATOR_INFO;
+    actuator_cfg_data.cfg.set_info = (struct msm_actuator_set_info_t){
+      .actuator_params = {
+        .act_type = ACTUATOR_BIVCM,
+        .reg_tbl_size = 1,
+        .data_size = 10,
+        .init_setting_size = 5,
+        .i2c_freq_mode = I2C_STANDARD_MODE,
+        .i2c_addr = 24,
+        .i2c_addr_type = MSM_ACTUATOR_BYTE_ADDR,
+        .i2c_data_type = MSM_ACTUATOR_WORD_DATA,
+        .reg_tbl_params = &actuator_reg_params[0],
+        .init_settings = &actuator_init_settings[0],
+        .park_lens = {.damping_step = 1023, .damping_delay = 14000, .hw_params = 11, .max_step = 20},
+      },
+      .af_tuning_params = {
+        .initial_code = (int16_t)s->infinity_dac,
+        .pwd_step = 0,
+        .region_size = 1,
+        .total_steps = 238,
+        .region_params = &region_params[0],
+      },
+    };
 
-      cam_ioctl(s->actuator_fd, VIDIOC_MSM_ACTUATOR_CFG, &actuator_cfg_data, "actuator set info");
-    }
+    cam_ioctl(s->actuator_fd, VIDIOC_MSM_ACTUATOR_CFG, &actuator_cfg_data, "actuator set info");
   }
-
+}
   if (s->camera_id == CAMERA_ID_IMX298) {
     err = sensor_write_regs(s, mode_setting_array_imx298, std::size(mode_setting_array_imx298), MSM_CAMERA_I2C_BYTE_DATA);
     LOG("sensor setup: %d", err);
@@ -1172,12 +1171,11 @@ static void road_camera_start(CameraState *s) {
     actuator_ringing_params.hw_params = 13;
 
     // focus on infinity assuming phone is perpendicular
-    inf_step = 512 - s->infinity_dac;
+  inf_step = 512 - s->infinity_dac;
 
-    // initial guess
-    s->lens_true_pos = 400;
-  }
-
+  // initial guess
+  s->lens_true_pos = 400;
+}
   // reset lens position
   memset(&actuator_cfg_data, 0, sizeof(actuator_cfg_data));
   actuator_cfg_data.cfgtype = CFG_SET_POSITION;
@@ -1294,7 +1292,21 @@ static void parse_autofocus(CameraState *s, uint8_t *d) {
   s->focus_err = max_focus*1.0;
 }
 
-static void do_autofocus(CameraState *s) {
+static std::optional<float> get_accel_z(SubMaster *sm) {
+  sm->update(0);
+  if(sm->updated("sensorEvents")) {
+    for (auto event : (*sm)["sensorEvents"].getSensorEvents()) {
+      if (event.which() == cereal::SensorEventData::ACCELERATION) {
+        if (auto v = event.getAcceleration().getV(); v.size() >= 3)
+          return -v[2];
+        break;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+static void do_autofocus(CameraState *s, SubMaster *sm) {
   const int dac_down = s->device == DEVICE_LP3 ? LP3_AF_DAC_DOWN : OP3T_AF_DAC_DOWN;
   const int dac_up = s->device == DEVICE_LP3 ? LP3_AF_DAC_UP : OP3T_AF_DAC_UP;
 
@@ -1305,10 +1317,16 @@ static void do_autofocus(CameraState *s) {
     lens_true_pos -= s->focus_err*focus_kp;
   }
 
+  if (auto accel_z = get_accel_z(sm)) {
+    s->last_sag_acc_z = *accel_z;
+  }
+  const float sag = (s->last_sag_acc_z / 9.8) * 128;
   // stay off the walls
-  lens_true_pos = std::clamp(lens_true_pos, float(LP3_AF_DAC_DOWN), float(LP3_AF_DAC_UP));
+  lens_true_pos = std::clamp(lens_true_pos, float(dac_down), float(dac_up));
+  int target = std::clamp(lens_true_pos - sag, float(dac_down), float(dac_up));
   s->lens_true_pos.store(lens_true_pos);
-  actuator_move(s, lens_true_pos);
+
+  actuator_move(s, target);
 }
 
 void camera_autoexposure(CameraState *s, float grey_frac) {
@@ -1354,7 +1372,7 @@ void cameras_open(MultiCameraState *s) {
   assert(s->v4l_fd >= 0);
 
   if (s->device == DEVICE_LP3) {
-    s->ispif_fd = HANDLE_EINTR(open("/dev/v4l-subdev15", O_RDWR | O_NONBLOCK));
+  s->ispif_fd = HANDLE_EINTR(open("/dev/v4l-subdev15", O_RDWR | O_NONBLOCK));
   } else {
     s->ispif_fd = HANDLE_EINTR(open("/dev/v4l-subdev16", O_RDWR | O_NONBLOCK));
   }
@@ -1418,6 +1436,7 @@ static void camera_close(CameraState *s) {
       cam_ioctl(s->isp_fd, VIDIOC_MSM_ISP_RELEASE_STREAM, &stream_release, "isp release stream");
     }
   }
+  free(s->eeprom);
 }
 
 const char* get_isp_event_name(uint32_t type) {
@@ -1468,11 +1487,12 @@ static void ops_thread(MultiCameraState *s) {
   CameraExpInfo driver_cam_op;
 
   util::set_thread_name("camera_settings");
+  SubMaster sm({"sensorEvents"});
   while(!do_exit) {
     road_cam_op = road_cam_exp.load();
     if (road_cam_op.op_id != last_road_cam_op_id) {
       do_autoexposure(&s->road_cam, road_cam_op.grey_frac);
-      do_autofocus(&s->road_cam);
+      do_autofocus(&s->road_cam, &sm);
       last_road_cam_op_id = road_cam_op.op_id;
     }
 
@@ -1591,6 +1611,7 @@ void cameras_run(MultiCameraState *s) {
             .frame_length = (uint32_t)c->frame_length,
             .integ_lines = (uint32_t)c->cur_integ_lines,
             .lens_pos = c->cur_lens_pos,
+            .lens_sag = c->last_sag_acc_z,
             .lens_err = c->focus_err,
             .lens_true_pos = c->lens_true_pos,
             .gain = c->cur_gain_frac,
