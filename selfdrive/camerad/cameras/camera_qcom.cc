@@ -1436,7 +1436,6 @@ static void camera_close(CameraState *s) {
       cam_ioctl(s->isp_fd, VIDIOC_MSM_ISP_RELEASE_STREAM, &stream_release, "isp release stream");
     }
   }
-  free(s->eeprom);
 }
 
 const char* get_isp_event_name(uint32_t type) {

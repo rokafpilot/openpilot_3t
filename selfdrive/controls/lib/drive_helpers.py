@@ -3,6 +3,7 @@ from cereal import car
 from common.numpy_fast import clip, interp
 from common.realtime import DT_MDL
 from selfdrive.config import Conversions as CV
+from selfdrive.kegman_kans_conf import kegman_kans_conf
 from selfdrive.modeld.constants import T_IDXS
 
 # cruise button by neokii
