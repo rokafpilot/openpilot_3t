@@ -821,11 +821,6 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.NO_ENTRY: NoEntryAlert("Cruise Fault: Restart the Car"),
   },
 
-  EventName.lkasDisabled: {
-    ET.PERMANENT: NormalPermanentAlert("LKAS Disabled: Enable LKAS to engage"),
-    ET.NO_ENTRY: NoEntryAlert("LKAS Disabled"),
-  },
-
   EventName.turningIndicatorOn: {
     ET.WARNING: Alert(
       "TAKE CONTROL",
@@ -833,9 +828,4 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
       AlertStatus.userPrompt, AlertSize.small,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .2),
   },
-
-  EventName.autoLaneChange: {
-    ET.WARNING: auto_lane_change_alert,
-  },
-
 }
