@@ -7,6 +7,7 @@
 #include <QObject>
 #include <QTimer>
 #include <QColor>
+#include <QFuture>
 #include <QTransform>
 
 #include "cereal/messaging/messaging.h"
@@ -14,7 +15,7 @@
 #include "selfdrive/common/params.h"
 #include "selfdrive/common/timing.h"
 
-const int bdr_s = 30;
+const int bdr_s = 20;
 const int header_h = 420;
 const int footer_h = 280;
 
@@ -37,13 +38,15 @@ struct Alert {
   }
 
   static Alert get(const SubMaster &sm, uint64_t started_frame) {
+    const cereal::ControlsState::Reader &cs = sm["controlsState"].getControlsState();
     if (sm.updated("controlsState")) {
-      const cereal::ControlsState::Reader &cs = sm["controlsState"].getControlsState();
       return {cs.getAlertText1().cStr(), cs.getAlertText2().cStr(),
               cs.getAlertType().cStr(), cs.getAlertSize(),
               cs.getAlertSound()};
     } else if ((sm.frame - started_frame) > 5 * UI_FREQ) {
       const int CONTROLS_TIMEOUT = 5;
+      const int controls_missing = (nanos_since_boot() - sm.rcv_time("controlsState")) / 1e9;
+
       // Handle controls timeout
       if (sm.rcv_frame("controlsState") < started_frame) {
         // car is started, but controlsState hasn't been seen at all
@@ -151,6 +154,7 @@ private:
   bool ignition_on = false;
   int last_brightness = 0;
   FirstOrderFilter brightness_filter;
+  QFuture<void> brightness_future;
 
   void updateBrightness(const UIState &s);
   void updateWakefulness(const UIState &s);
