@@ -207,7 +207,7 @@ void ignition_can_hook(CANPacket_t *to_push) {
     if ((addr == 0x1F1) && (len == 8)) {
       // Bit 5 is ignition "on"
       bool ignition_gm = ((GET_BYTE(to_push, 0) & 0x20U) != 0U);
-      ignition_can = ignition_gm || ignition_cadillac;
+      ignition_can = ignition_gm;
     }
 
     // Tesla exception
