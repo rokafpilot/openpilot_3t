@@ -373,9 +373,9 @@ struct DeviceState @0xa4d8b5af2aa492eb {
   batDEPRECATED @6 :UInt32;
   pa0DEPRECATED @21 :UInt16;
   cpuUsagePercentDEPRECATED @20 :Int8;
-  batteryStatusDEPRECATED @9 :Text;
+  batteryStatus @9 :Text;
   batteryVoltageDEPRECATED @16 :Int32;
-  batteryTempCDEPRECATED @29 :Float32;
+  batteryTempC @29 :Float32;
 }
 
 struct PandaState @0xa7649e2575e4591e {
