@@ -821,11 +821,4 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.NO_ENTRY: NoEntryAlert("Cruise Fault: Restart the Car"),
   },
 
-  EventName.turningIndicatorOn: {
-    ET.WARNING: Alert(
-      "TAKE CONTROL",
-      "Steer Unavailable while Turning",
-      AlertStatus.userPrompt, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, .2),
-  },
 }
