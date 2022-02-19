@@ -144,10 +144,15 @@ void OnroadWindow::offroadTransition(bool offroad) {
   if (!offroad) {
     if (map == nullptr && (uiState()->has_prime || !MAPBOX_TOKEN.isEmpty())) {
       MapWindow * m = new MapWindow(get_mapbox_settings());
-      m->setFixedWidth(topWidget(this)->width() / 2);
-      QObject::connect(uiState(), &UIState::offroadTransition, m, &MapWindow::offroadTransition);
-      split->addWidget(m, 0, Qt::AlignRight);
       map = m;
+
+      QObject::connect(uiState(), &UIState::offroadTransition, m, &MapWindow::offroadTransition);
+
+      m->setFixedWidth(topWidget(this)->width() / 2);
+      split->addWidget(m, 0, Qt::AlignRight);
+
+      // Make map visible after adding to split
+      m->offroadTransition(offroad);
     }
   }
 #endif
@@ -409,7 +414,7 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIScene &scene) {
   }
   // paint path
   QLinearGradient bg(0, height(), 0, height() / 4);
-  bg.setColorAt(0, scene.end_to_end ? redColor() : QColor(255, 255, 255));
+  bg.setColorAt(0, scene.end_to_end ? redColor(200) : QColor(255, 255, 255, 200));
   bg.setColorAt(1, scene.end_to_end ? redColor(0) : QColor(255, 255, 255, 0));
   painter.setBrush(bg);
   painter.drawPolygon(scene.track_vertices.v, scene.track_vertices.cnt);
@@ -504,11 +509,11 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
   int limit_speed = 0;
   int left_dist = 0;
 
-  if(camLimitSpeed >= 30 && camLimitSpeedLeftDist > 0) {
+  if(camLimitSpeed > 0 && camLimitSpeedLeftDist > 0) {
     limit_speed = camLimitSpeed;
     left_dist = camLimitSpeedLeftDist;
   }
-  else if(sectionLimitSpeed >= 30 && sectionLeftDist > 0) {
+  else if(sectionLimitSpeed > 0 && sectionLeftDist > 0) {
     limit_speed = sectionLimitSpeed;
     left_dist = sectionLeftDist;
   }
@@ -524,16 +529,16 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
       p.drawPixmap(x, y, w, h, activeNDA == 1 ? ic_nda : ic_hda);
   }
 
-  if(limit_speed > 10 && left_dist > 0)
+  if(limit_speed > 10 && limit_speed < 130)
   {
-    int radius = 192;
+    int radius_ = 192;
 
     int x = 30;
     int y = 270;
 
     p.setPen(Qt::NoPen);
     p.setBrush(QBrush(QColor(255, 0, 0, 255)));
-    QRect rect = QRect(x, y, radius, radius);
+    QRect rect = QRect(x, y, radius_, radius_);
     p.drawEllipse(rect);
 
     p.setBrush(QBrush(QColor(255, 255, 255, 255)));
@@ -547,17 +552,47 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
 
     if(left_dist >= 1000)
       str_left_dist.sprintf("%.1fkm", left_dist / 1000.f);
-    else
+    else if(left_dist > 0)
       str_left_dist.sprintf("%dm", left_dist);
 
     configFont(p, "Open Sans", 80, "Bold");
     p.setPen(QColor(0, 0, 0, 230));
     p.drawText(rect, Qt::AlignCenter, str_limit_speed);
 
-    configFont(p, "Open Sans", 60, "Bold");
-    rect.translate(0, radius/2 + 45);
-    rect.adjust(-30, 0, 30, 0);
-    p.setPen(QColor(255, 255, 255, 230));
-    p.drawText(rect, Qt::AlignCenter, str_left_dist);
+    if(str_left_dist.length() > 0) {
+      configFont(p, "Open Sans", 60, "Bold");
+      rect.translate(0, radius_/2 + 45);
+      rect.adjust(-30, 0, 30, 0);
+      p.setPen(QColor(255, 255, 255, 230));
+      p.drawText(rect, Qt::AlignCenter, str_left_dist);
+    }
+  }
+  else {
+    auto controls_state = sm["controlsState"].getControlsState();
+    int sccStockCamAct = (int)controls_state.getSccStockCamAct();
+    int sccStockCamStatus = (int)controls_state.getSccStockCamStatus();
+
+    if(sccStockCamAct == 2 && sccStockCamStatus == 2) {
+      int radius_ = 192;
+
+      int x = 30;
+      int y = 270;
+
+      p.setPen(Qt::NoPen);
+
+      p.setBrush(QBrush(QColor(255, 0, 0, 255)));
+      QRect rect = QRect(x, y, radius_, radius_);
+      p.drawEllipse(rect);
+
+      p.setBrush(QBrush(QColor(255, 255, 255, 255)));
+
+      const int tickness = 14;
+      rect.adjust(tickness, tickness, -tickness, -tickness);
+      p.drawEllipse(rect);
+
+      configFont(p, "Open Sans", 70, "Bold");
+      p.setPen(QColor(0, 0, 0, 230));
+      p.drawText(rect, Qt::AlignCenter, "CAM");
+    }
   }
 }

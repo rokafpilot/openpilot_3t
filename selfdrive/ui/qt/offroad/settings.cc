@@ -60,12 +60,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "../assets/offroad/icon_metric.png",
     },
     {
-      "CommunityFeaturesToggle",
-      "Enable Community Features",
-      "Use features, such as community supported hardware, from the open source community that are not maintained or supported by comma.ai and have not been confirmed to meet the standard safety model. Be extra cautious when using these features",
-      "../assets/offroad/icon_shell.png",
-    },
-    {
       "RecordFront",
       "Record and Upload Driver Camera",
       "Upload data from the driver facing camera and help improve the driver monitoring algorithm.",
@@ -200,6 +194,10 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   poweroff_btn->setObjectName("poweroff_btn");
   power_layout->addWidget(poweroff_btn);
   QObject::connect(poweroff_btn, &QPushButton::clicked, this, &DevicePanel::poweroff);
+
+  if (Hardware::TICI()) {
+    connect(uiState(), &UIState::offroadTransition, poweroff_btn, &QPushButton::setVisible);
+  }
 
   setStyleSheet(R"(
     #reboot_btn { height: 120px; border-radius: 15px; background-color: #393939; }
@@ -467,7 +465,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
         color: grey;
         border: none;
         background: none;
-        font-size: 60px;
+        font-size: 65px;
         font-weight: 500;
         padding-top: %1px;
         padding-bottom: %1px;
@@ -518,47 +516,4 @@ void SettingsWindow::hideEvent(QHideEvent *event) {
 #ifdef QCOM
   HardwareEon::close_activities();
 #endif
-}
-  // Back button
-  QPushButton* back = new QPushButton("Back");
-  back->setObjectName("back_btn");
-  back->setFixedSize(500, 100);
-  connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
-  main_layout->addWidget(back, 0, Qt::AlignLeft);
-
-  QListWidget* list = new QListWidget(this);
-  list->setStyleSheet("QListView {padding: 40px; background-color: #393939; border-radius: 15px; height: 140px;} QListView::item{height: 100px}");
-  //list->setAttribute(Qt::WA_AcceptTouchEvents, true);
-  QScroller::grabGesture(list->viewport(), QScroller::LeftMouseButtonGesture);
-  list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-
-  list->addItem("[ Not selected ]");
-
-  QStringList items = get_list("/data/params/d/SupportedCars");
-  list->addItems(items);
-  list->setCurrentRow(0);
-
-  QString selected = QString::fromStdString(Params().get("SelectedCar"));
-
-  int index = 0;
-  for(QString item : items) {
-    if(selected == item) {
-        list->setCurrentRow(index + 1);
-        break;
-    }
-    index++;
-  }
-
-  QObject::connect(list, QOverload<QListWidgetItem*>::of(&QListWidget::itemClicked),
-    [=](QListWidgetItem* item){
-
-    if(list->currentRow() == 0)
-        Params().remove("SelectedCar");
-    else
-        Params().put("SelectedCar", list->currentItem()->text().toStdString());
-
-    emit selectedCar();
-    });
-
-  main_layout->addWidget(list);
 }
