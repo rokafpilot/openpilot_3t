@@ -7,7 +7,7 @@
 #include "selfdrive/ui/qt/util.h"
 
 void Sidebar::drawMetric(QPainter &p, const QString &label, QColor c, int y) {
-  const QRect rect = {30, y, 240, label.contains("\n") ? 124 : 100};
+  const QRect rect = {30, y, 240, label.contains("\n") ? 130 : 130};
 
   p.setPen(Qt::NoPen);
   p.setBrush(QBrush(c));
@@ -22,8 +22,8 @@ void Sidebar::drawMetric(QPainter &p, const QString &label, QColor c, int y) {
   p.drawRoundedRect(rect, 20, 20);
 
   p.setPen(QColor(0xff, 0xff, 0xff));
-  configFont(p, "Open Sans", 35, "Bold");
-  const QRect r = QRect(rect.x() + 30, rect.y(), rect.width() - 40, rect.height());
+  configFont(p, "Open Sans", 35, "Regular");
+  const QRect r = QRect(rect.x() + 35, rect.y(), rect.width() - 50, rect.height());
   p.drawText(r, Qt::AlignCenter, label);
 }
 
@@ -78,17 +78,18 @@ void Sidebar::updateState(const UIState &s) {
   ItemStatus pandaStatus = {"VEHICLE\nONLINE", good_color};
   if (s.scene.pandaType == cereal::PandaState::PandaType::UNKNOWN) {
     pandaStatus = {"NO\nPANDA", danger_color};
-  } else if (s.scene.started && !sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK()) {
+  } /*else if (s.scene.started && !sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK()) {
     pandaStatus = {"GPS\nSEARCHING", warning_color};
-  }
+  }*/
   setProperty("pandaStatus", QVariant::fromValue(pandaStatus));
+  m_battery_img = deviceState.getBatteryStatus() == "Charging" ? 1 : 0;
+  m_batteryPercent = deviceState.getBatteryPercent();
 }
 
 void Sidebar::paintEvent(QPaintEvent *event) {
   QPainter p(this);
   p.setPen(Qt::NoPen);
   p.setRenderHint(QPainter::Antialiasing);
-
   p.fillRect(rect(), QColor(57, 57, 57));
 
   // static imgs
@@ -106,19 +107,34 @@ void Sidebar::paintEvent(QPaintEvent *event) {
     x += 37;
   }
 
+  //battery
+  QRect  rect(45, 293, 96, 36);
+  QRect  bq(50, 298, int(76* m_batteryPercent * 0.01), 25);
+  QBrush bgBrush("#149948");
+  p.fillRect(bq, bgBrush);
+  p.drawPixmap(rect, battery_imgs[m_battery_img]);
+
+  p.setPen(Qt::white);
   configFont(p, "Open Sans", 30, "Regular");
+
+  char battery_str[5];
+
+  const QRect bt = QRect(170, 288, event->rect().width(), 50);
+  snprintf(battery_str, sizeof(battery_str), "%d%%", m_batteryPercent);
+  p.drawText(bt, Qt::AlignLeft, battery_str);
+
+  configFont(p, "Open Sans", 31, "Regular");
   p.setPen(QColor(0xff, 0xff, 0xff));
+  const QRect r = QRect(20, 237, 250, 50);
 
-  const QRect r = QRect(0, 247, event->rect().width(), 50);
-
-  if(net_type == network_type[cereal::DeviceState::NetworkType::WIFI])
+  if(Hardware::EON() && net_type == network_type[cereal::DeviceState::NetworkType::WIFI])
     p.drawText(r, Qt::AlignCenter, wifi_addr);
   else
     p.drawText(r, Qt::AlignCenter, net_type);
 
   // metrics
   configFont(p, "Open Sans", 35, "Regular");
-  drawMetric(p, temp_status.first, temp_status.second, 338);
-  drawMetric(p, panda_status.first, panda_status.second, 496);
-  drawMetric(p, connect_status.first, connect_status.second, 654);
+  drawMetric(p, temp_status.first, temp_status.second, 355);
+  drawMetric(p, panda_status.first, panda_status.second, 518);
+  drawMetric(p, connect_status.first, connect_status.second, 676);
 }
