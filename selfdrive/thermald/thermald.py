@@ -32,6 +32,7 @@ TEMP_TAU = 5.   # 5s time constant
 DISCONNECT_TIMEOUT = 5.  # wait 5 seconds before going offroad after disconnect so you get an alert
 
 ThermalBand = namedtuple("ThermalBand", ['min_temp', 'max_temp'])
+HardwareState = namedtuple("HardwareState", ['network_type', 'network_strength', 'network_info', 'nvme_temps', 'modem_temps', 'wifi_address'])
 
 # List of thermal bands. We will stay within this region as long as we are within the bounds.
 # When exiting the bounds, we'll jump to the lower or higher band. Bands are ordered in the dict.
@@ -348,10 +349,10 @@ def thermald_thread():
 
     # Ensure date/time are valid
     now = datetime.datetime.utcnow()
-    startup_conditions["time_valid"] = (now.year > 2020) or (now.year == 2020 and now.month >= 10)
-    set_offroad_alert_if_changed("Offroad_InvalidTime", (not startup_conditions["time_valid"]))
+    startup_conditions["time_valid"] = True #(now.year > 2020) or (now.year == 2020 and now.month >= 10)
+    #set_offroad_alert_if_changed("Offroad_InvalidTime", (not startup_conditions["time_valid"]))
 
-    startup_conditions["up_to_date"] = params.get("Offroad_ConnectivityNeeded") is None or params.get_bool("DisableUpdates") or params.get_bool("SnoozeUpdate")
+    startup_conditions["up_to_date"] = True #params.get("Offroad_ConnectivityNeeded") is None or params.get_bool("DisableUpdates") or params.get_bool("SnoozeUpdate")
     startup_conditions["not_uninstalling"] = not params.get_bool("DoUninstall")
     startup_conditions["accepted_terms"] = params.get("HasAcceptedTerms") == terms_version
 
@@ -367,7 +368,8 @@ def thermald_thread():
     set_offroad_alert_if_changed("Offroad_TemperatureTooHigh", (not onroad_conditions["device_temp_good"]))
 
     if TICI:
-      set_offroad_alert_if_changed("Offroad_StorageMissing", (not Path("/data/media").is_mount()))
+      missing = (not Path("/data/media").is_mount()) and (not os.path.isfile("/persist/comma/living-in-the-moment"))
+      set_offroad_alert_if_changed("Offroad_StorageMissing", missing)
 
     # Handle offroad/onroad transition
     should_start = all(onroad_conditions.values())
@@ -442,6 +444,7 @@ def thermald_thread():
 
     msg.deviceState.thermalStatus = thermal_status
     pm.send("deviceState", msg)
+
     if EON and not is_uno:
       set_offroad_alert_if_changed("Offroad_ChargeDisabled", (not usb_power))
 
