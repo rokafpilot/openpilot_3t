@@ -2,6 +2,8 @@
 
 #include <QMouseEvent>
 
+#include "selfdrive/common/util.h"
+#include "selfdrive/hardware/hw.h"
 #include "selfdrive/ui/qt/util.h"
 
 void Sidebar::drawMetric(QPainter &p, const QString &label, QColor c, int y) {
@@ -53,6 +55,7 @@ void Sidebar::updateState(const UIState &s) {
   setProperty("netType", network_type[deviceState.getNetworkType()]);
   int strength = (int)deviceState.getNetworkStrength();
   setProperty("netStrength", strength > 0 ? strength + 1 : 0);
+  setProperty("wifiAddr", deviceState.getWifiIpAddress().cStr());
 
   ItemStatus connectStatus;
   auto last_ping = deviceState.getLastAthenaPingTime();
@@ -79,6 +82,8 @@ void Sidebar::updateState(const UIState &s) {
     pandaStatus = {"GPS\nSEARCHING", warning_color};
   }
   setProperty("pandaStatus", QVariant::fromValue(pandaStatus));
+  m_battery_img = deviceState.getBatteryStatus() == "Charging" ? 1 : 0;
+  m_batteryPercent = deviceState.getBatteryPercent();
 }
 
 void Sidebar::paintEvent(QPaintEvent *event) {
@@ -94,6 +99,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   p.setOpacity(1.0);
   p.drawPixmap(60, 1080 - 180 - 40, home_img);
 
+#ifndef QCOM
   // network
   int x = 58;
   const QColor gray(0x54, 0x54, 0x54);
@@ -102,13 +108,31 @@ void Sidebar::paintEvent(QPaintEvent *event) {
     p.drawEllipse(x, 196, 27, 27);
     x += 37;
   }
+#endif
 
-  configFont(p, "Open Sans", 35, "Regular");
+#ifdef QCOM
+  // battery status
+  p.drawImage(68, 180, battery_imgs[m_battery_img]); // signal_imgs to battery_imgs
+  configFont(p, "Open Sans", 32, "Bold");
+  p.setPen(QColor(0x00, 0x00, 0x00));
+  const QRect r = QRect(80, 193, 100, 50);
+  char battery_str[5];
+  snprintf(battery_str, sizeof(battery_str), "%d%%", m_batteryPercent);
+  p.drawText(r, Qt::AlignCenter, battery_str);
+#endif
+
+
+  configFont(p, "Open Sans", 30, "Regular");
   p.setPen(QColor(0xff, 0xff, 0xff));
-  const QRect r = QRect(50, 247, 100, 50);
-  p.drawText(r, Qt::AlignCenter, net_type);
+  const QRect r2 = QRect(0, 267, event->rect().width(), 50);
+
+  if (net_type == network_type[cereal::DeviceState::NetworkType::WIFI])
+    p.drawText(r2, Qt::AlignCenter, wifi_addr);
+  else
+    p.drawText(r2, Qt::AlignCenter, net_type);
 
   // metrics
+  configFont(p, "Open Sans", 35, "Regular");
   drawMetric(p, temp_status.first, temp_status.second, 338);
   drawMetric(p, panda_status.first, panda_status.second, 496);
   drawMetric(p, connect_status.first, connect_status.second, 654);
