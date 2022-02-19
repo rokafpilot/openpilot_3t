@@ -492,12 +492,6 @@ def thermald_thread(end_event, hw_queue):
         time.sleep(5)
         HARDWARE.shutdown()
 
-    # If UI has crashed, set the brightness to reasonable non-zero value
-    ui_running = "ui" in (p.name for p in sm["managerState"].processes if p.running)
-    if ui_running_prev and not ui_running:
-      HARDWARE.set_screen_brightness(20)
-    ui_running_prev = ui_running
-
     msg.deviceState.chargingError = current_filter.x > 0. and msg.deviceState.batteryPercent < 90  # if current is positive, then battery is being discharged
     msg.deviceState.started = started_ts is not None
     msg.deviceState.startedMonoTime = int(1e9*(started_ts or 0))
