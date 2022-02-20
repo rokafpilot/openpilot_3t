@@ -3,6 +3,7 @@
 #include <optional>
 #include <QtDBus>
 #include <QTimer>
+#include <optional>
 
 #include "selfdrive/ui/qt/offroad/networkmanager.h"
 
