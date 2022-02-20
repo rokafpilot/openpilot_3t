@@ -109,18 +109,7 @@ static void update_state(UIState *s) {
   SubMaster &sm = *(s->sm);
   UIScene &scene = s->scene;
 
-  if (sm.updated("modelV2")) {
-    update_model(s, sm["modelV2"].getModelV2());
-  }
-  if (sm.updated("radarState")) {
-    std::optional<cereal::ModelDataV2::XYZTData::Reader> line;
-    if (sm.rcv_frame("modelV2") > 0) {
-      line = sm["modelV2"].getModelV2().getPosition();
-    }
-    update_leads(s, sm["radarState"].getRadarState(), line);
-  }
   if (sm.updated("liveCalibration")) {
-    scene.world_objects_visible = true;
     auto rpy_list = sm["liveCalibration"].getLiveCalibration().getRpyCalib();
     Eigen::Vector3d rpy;
     rpy << rpy_list[0], rpy_list[1], rpy_list[2];
