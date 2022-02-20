@@ -22,11 +22,12 @@ from selfdrive.controls.lib.alertmanager import set_offroad_alert
 from selfdrive.controls.lib.pid import PIController
 from selfdrive.hardware import EON, HARDWARE, PC, TICI
 from selfdrive.loggerd.config import get_available_percent
-from selfdrive.kegman_kans_conf import kegman_kans_conf
-kegman_kans = kegman_kans_conf()
+from selfdrive.statsd import statlog
 from selfdrive.swaglog import cloudlog
 from selfdrive.thermald.power_monitoring import PowerMonitoring
 from selfdrive.version import terms_version, training_version
+from selfdrive.kegman_kans_conf import kegman_kans_conf
+kegman_kans = kegman_kans_conf()
 
 ThermalStatus = log.DeviceState.ThermalStatus
 NetworkType = log.DeviceState.NetworkType
@@ -251,7 +252,7 @@ def thermald_thread(end_event, hw_queue):
   last_hw_state = HardwareState(
     network_type=NetworkType.none,
     network_strength=NetworkStrength.unknown,
-    network_info = None,
+    network_info=None,
     nvme_temps=[],
     modem_temps=[],
     wifi_address='N/A',
@@ -445,18 +446,6 @@ def thermald_thread(end_event, hw_queue):
       started_ts = None
       if off_ts is None:
         off_ts = sec_since_boot()
-# from bellow line, to control charging disabled
-        os.system('echo powersave > /sys/class/devfreq/soc:qcom,cpubw/governor')
-
-    charging_disabled = check_car_battery_voltage(should_start, pandaStates, charging_disabled, msg)
-
-    if msg.deviceState.batteryCurrent > 0:
-      msg.deviceState.batteryStatus = "Discharging"
-    else:
-      msg.deviceState.batteryStatus = "Charging"
-
-
-    msg.deviceState.chargingDisabled = charging_disabled #to this line
 
     # Offroad power monitoring
     power_monitor.calculate(peripheralState, onroad_conditions["ignition"])
@@ -477,20 +466,18 @@ def thermald_thread(end_event, hw_queue):
 
     # Check if we need to shut down
     if power_monitor.should_shutdown(peripheralState, onroad_conditions["ignition"], in_car, off_ts, started_seen):
-      cloudlog.info(f"shutting device down, offroad since {off_ts}")
-      # TODO: add function for blocking cloudlog instead of sleep
-      time.sleep(10)
-      HARDWARE.shutdown()
+      cloudlog.warning(f"shutting device down, offroad since {off_ts}")
+      params.put_bool("DoShutdown", True)
 
     # dp - auto shutdown EON only logic applied
-    if EON and off_ts is not None and not HARDWARE.get_usb_present():
-      shutdown_sec = 240
-      sec_now = sec_since_boot() - off_ts
-      if (shutdown_sec - 5) < sec_now:
-        msg.deviceState.chargingDisabled = True
-      if shutdown_sec < sec_now:
-        time.sleep(5)
-        HARDWARE.shutdown()
+#    if EON and off_ts is not None and not HARDWARE.get_usb_present():
+#      shutdown_sec = 240
+#      sec_now = sec_since_boot() - off_ts
+#      if (shutdown_sec - 5) < sec_now:
+#        msg.deviceState.chargingDisabled = True
+#      if shutdown_sec < sec_now:
+#        time.sleep(5)
+#        HARDWARE.shutdown()
 
     msg.deviceState.chargingError = current_filter.x > 0. and msg.deviceState.batteryPercent < 90  # if current is positive, then battery is being discharged
     msg.deviceState.started = started_ts is not None
@@ -509,6 +496,27 @@ def thermald_thread(end_event, hw_queue):
 
     should_start_prev = should_start
     startup_conditions_prev = startup_conditions.copy()
+
+    # Log to statsd
+    statlog.gauge("free_space_percent", msg.deviceState.freeSpacePercent)
+    statlog.gauge("gpu_usage_percent", msg.deviceState.gpuUsagePercent)
+    statlog.gauge("memory_usage_percent", msg.deviceState.memoryUsagePercent)
+    for i, usage in enumerate(msg.deviceState.cpuUsagePercent):
+      statlog.gauge(f"cpu{i}_usage_percent", usage)
+    for i, temp in enumerate(msg.deviceState.cpuTempC):
+      statlog.gauge(f"cpu{i}_temperature", temp)
+    for i, temp in enumerate(msg.deviceState.gpuTempC):
+      statlog.gauge(f"gpu{i}_temperature", temp)
+    statlog.gauge("memory_temperature", msg.deviceState.memoryTempC)
+    statlog.gauge("ambient_temperature", msg.deviceState.ambientTempC)
+    for i, temp in enumerate(msg.deviceState.pmicTempC):
+      statlog.gauge(f"pmic{i}_temperature", temp)
+    for i, temp in enumerate(last_hw_state.nvme_temps):
+      statlog.gauge(f"nvme_temperature{i}", temp)
+    for i, temp in enumerate(last_hw_state.modem_temps):
+      statlog.gauge(f"modem_temperature{i}", temp)
+    statlog.gauge("fan_speed_percent_desired", msg.deviceState.fanSpeedPercentDesired)
+    statlog.gauge("screen_brightness_percent", msg.deviceState.screenBrightnessPercent)
 
     # report to server once every 10 minutes
     #if (count % int(600. / DT_TRML)) == 0:
