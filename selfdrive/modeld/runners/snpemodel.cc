@@ -14,10 +14,9 @@ void PrintErrorStringAndExit() {
   std::exit(EXIT_FAILURE);
 }
 
-SNPEModel::SNPEModel(const char *path, float *loutput, size_t loutput_size, int runtime, bool luse_extra) {
+SNPEModel::SNPEModel(const char *path, float *loutput, size_t loutput_size, int runtime) {
   output = loutput;
   output_size = loutput_size;
-  use_extra = luse_extra;
 #if defined(QCOM) || defined(QCOM2)
   if (runtime==USE_GPU_RUNTIME) {
     Runtime = zdl::DlSystem::Runtime_t::GPU;
@@ -91,7 +90,8 @@ SNPEModel::SNPEModel(const char *path, float *loutput, size_t loutput_size, int 
     inputMap.add(input_tensor_name, inputBuffer.get());
   }
 
-  if (use_extra) {
+  // create extra input buffer
+  {
     const char *extra_tensor_name = strListi.at(1);
     const auto &extraDims_opt = snpe->getInputDimensions(extra_tensor_name);
     const zdl::DlSystem::TensorShape& bufferShape = *extraDims_opt;
@@ -153,7 +153,7 @@ void SNPEModel::addExtra(float *image_buf, int buf_size) {
 
 std::unique_ptr<zdl::DlSystem::IUserBuffer> SNPEModel::addExtra(float *state, int state_size, int idx) {
   // get input and output names
-  const auto real_idx = idx + (use_extra ? 1 : 0);
+  const auto real_idx = idx + 1;
   const auto &strListi_opt = snpe->getInputTensorNames();
   if (!strListi_opt) throw std::runtime_error("Error obtaining Input tensor names");
   const auto &strListi = *strListi_opt;
@@ -174,11 +174,9 @@ void SNPEModel::execute() {
     if (thneed == NULL) {
       bool ret = inputBuffer->setBufferAddress(input);
       assert(ret == true);
-      if (use_extra) {
-        assert(extra != NULL);
-        bool extra_ret = extraBuffer->setBufferAddress(extra);
-        assert(extra_ret == true);
-      }
+      assert(extra != NULL);
+      bool extra_ret = extraBuffer->setBufferAddress(extra);
+      assert(extra_ret == true);
       if (!snpe->execute(inputMap, outputMap)) {
         PrintErrorStringAndExit();
       }
@@ -216,22 +214,15 @@ void SNPEModel::execute() {
       }
       free(outputs_golden);
     } else {
-      if (use_extra) {
-        float *inputs[5] = {recurrent, trafficConvention, desire, extra, input};
-        thneed->execute(inputs, output);
-      } else {
-        float *inputs[4] = {recurrent, trafficConvention, desire, input};
-        thneed->execute(inputs, output);
-      }
+      float *inputs[5] = {recurrent, trafficConvention, desire, extra, input};
+      thneed->execute(inputs, output);
     }
   } else {
 #endif
     bool ret = inputBuffer->setBufferAddress(input);
     assert(ret == true);
-    if (use_extra) {
-      bool extra_ret = extraBuffer->setBufferAddress(extra);
-      assert(extra_ret == true);
-    }
+    bool extra_ret = extraBuffer->setBufferAddress(extra);
+    assert(extra_ret == true);
     if (!snpe->execute(inputMap, outputMap)) {
       PrintErrorStringAndExit();
     }

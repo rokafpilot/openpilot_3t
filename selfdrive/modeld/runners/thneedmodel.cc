@@ -2,7 +2,7 @@
 
 #include <cassert>
 
-ThneedModel::ThneedModel(const char *path, float *loutput, size_t loutput_size, int runtime, bool luse_extra) {
+ThneedModel::ThneedModel(const char *path, float *loutput, size_t loutput_size, int runtime) {
   thneed = new Thneed(true);
   thneed->record = 0;
   thneed->load(path);
@@ -11,7 +11,6 @@ ThneedModel::ThneedModel(const char *path, float *loutput, size_t loutput_size, 
 
   recorded = false;
   output = loutput;
-  use_extra = luse_extra;
 }
 
 void ThneedModel::addRecurrent(float *state, int state_size) {
@@ -35,8 +34,7 @@ void ThneedModel::addExtra(float *extra_input_buf, int buf_size) {
 }
 
 void* ThneedModel::getInputBuf() {
-  if (use_extra && thneed->input_clmem.size() > 4) return &(thneed->input_clmem[4]);
-  else if (!use_extra && thneed->input_clmem.size() > 3) return &(thneed->input_clmem[3]);
+  if (thneed->input_clmem.size() > 4) return &(thneed->input_clmem[4]);
   else return nullptr;
 }
 
@@ -48,26 +46,16 @@ void* ThneedModel::getExtraBuf() {
 void ThneedModel::execute() {
   if (!recorded) {
     thneed->record = THNEED_RECORD;
-    if (use_extra) {
-      float *inputs[5] = {recurrent, trafficConvention, desire, extra, input};
-      thneed->copy_inputs(inputs);
-    } else {
-      float *inputs[4] = {recurrent, trafficConvention, desire, input};
-      thneed->copy_inputs(inputs);
-    }
+    float *inputs[5] = {recurrent, trafficConvention, desire, extra, input};
+    thneed->copy_inputs(inputs);
     thneed->clexec();
     thneed->copy_output(output);
     thneed->stop();
 
     recorded = true;
   } else {
-    if (use_extra) {
-      float *inputs[5] = {recurrent, trafficConvention, desire, extra, input};
-      thneed->execute(inputs, output);
-    } else {
-      float *inputs[4] = {recurrent, trafficConvention, desire, input};
-      thneed->execute(inputs, output);
-    }
+    float *inputs[5] = {recurrent, trafficConvention, desire, extra, input};
+    thneed->execute(inputs, output);
   }
 }
 

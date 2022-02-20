@@ -14,12 +14,11 @@
 #include "selfdrive/common/swaglog.h"
 #include "selfdrive/common/util.h"
 
-ONNXModel::ONNXModel(const char *path, float *_output, size_t _output_size, int runtime, bool _use_extra) {
+ONNXModel::ONNXModel(const char *path, float *_output, size_t _output_size, int runtime) {
   LOGD("loading model %s", path);
 
   output = _output;
   output_size = _output_size;
-  use_extra = _use_extra;
 
   int err = pipe(pipein);
   assert(err == 0);
