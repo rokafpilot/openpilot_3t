@@ -11,10 +11,11 @@ class CarState(CarStateBase):
   def __init__(self, CP):
     super().__init__(CP)
     can_define = CANDefine(DBC[CP.carFingerprint]["pt"])
-    self.shifter_values = can_define.dv["ECMPRDNL"]["PRNDL"]
+    self.shifter_values = can_define.dv["ECMPRDNL2"]["PRNDL2"]
     self.adaptive_Cruise = False
     self.enable_lkas = False
     self.lka_steering_cmd_counter = 0
+    self.park_brake = 0
 
   def update(self, pt_cp, loopback_cp):
     ret = car.CarState.new_message()
@@ -34,17 +35,35 @@ class CarState(CarStateBase):
     ret.standstill = ret.vEgoRaw < 0.01
     ret.vEgo = pt_cp.vl["ECMVehicleSpeed"]["VehicleSpeed"] * CV.MPH_TO_MS
 
-    ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(pt_cp.vl["ECMPRDNL"]["PRNDL"], None))
-    ret.brake = pt_cp.vl["EBCMBrakePedalPosition"]["BrakePedalPosition"] / 0xd0
+    gmGear = self.shifter_values.get(pt_cp.vl["ECMPRDNL2"]["PRNDL2"], None)
+    manualMode = bool(pt_cp.vl["ECMPRDNL2"]["ManualMode"])
+    
+    # In manumatic, the value of PRNDL2 represents the max gear
+    # parse_gear_shifter expects "T" for manumatic
+    # TODO: JJS Add manumatic max gear to cereal and parse (validate value in Acadia)
+    if manualMode:
+      gmGear = "T"
+    
+    # TODO: JJS: Should We just have 0 map to P in the dbc?
+    if gmGear == "Shifting":
+      gmGear = "P"
+    
+    ret.gearShifter = self.parse_gear_shifter(gmGear)
+    ret.brakePressed = pt_cp.vl["ECMEngineStatus"]["Brake_Pressed"] != 0
+    ret.brake = 0.
+    
+    if ret.brakePressed:
+      ret.brake = pt_cp.vl["EBCMBrakePedalPosition"]["BrakePedalPosition"] / 0xd0
+
     # Brake pedal's potentiometer returns near-zero reading even when pedal is not pressed.
     if ret.brake < 10/0xd0:
       ret.brake = 0.
 
     if self.CP.enableGasInterceptor:
       ret.gas = (pt_cp.vl["GAS_SENSOR"]["INTERCEPTOR_GAS"] + pt_cp.vl["GAS_SENSOR"]["INTERCEPTOR_GAS2"]) / 2.
-      ret.gasPressed = ret.gas > 20
+      ret.gasPressed = ret.gas > 15
     else:
-      ret.gas = pt_cp.vl["AcceleratorPedal"]["AcceleratorPedal"] / 254.
+      ret.gas = pt_cp.vl["AcceleratorPedal2"]["AcceleratorPedal2"] / 254.
       ret.gasPressed = ret.gas > 1e-5
 
     ret.steeringAngleDeg = pt_cp.vl["PSCMSteeringAngle"]["SteeringWheelAngle"]
@@ -71,86 +90,106 @@ class CarState(CarStateBase):
     ret.rightBlinker = pt_cp.vl["BCMTurnSignals"]["TurnSignals"] == 2
 
     self.park_brake = pt_cp.vl["EPBStatus"]["EPBClosed"]
-    self.main_on = bool(pt_cp.vl["ECMEngineStatus"]["CruiseMainOn"])
-    ret.mainOn = self.main_on
+    ret.cruiseState.available = pt_cp.vl["ECMEngineStatus"]["CruiseMainOn"] != 0
+
     ret.espDisabled = pt_cp.vl["ESPStatus"]["TractionControlOn"] != 1
     self.pcm_acc_status = pt_cp.vl["AcceleratorPedal2"]["CruiseState"]
-    ret.cruiseState.available = self.pcm_acc_status != 0
-    ret.cruiseState.standstill = False
 
-    ret.brakePressed = ret.brake > 1e-5
-    ret.regenPressed = False
-    if self.car_fingerprint == CAR.VOLT or self.car_fingerprint == CAR.BOLT:
-      ret.regenPressed = bool(pt_cp.vl["EBCMRegenPaddle"]["RegenPaddle"])
-    brake_light_enable = False
-    if self.car_fingerprint == CAR.BOLT:
-      if ret.aEgo < -1.3:
-        brake_light_enable = True
-    ret.brakeLights = ret.brakePressed or ret.regenPressed or brake_light_enable
+    # Regen braking is braking
+    if self.car_fingerprint in EV_CAR:
+      ret.brakePressed = ret.brakePressed or pt_cp.vl["EBCMRegenPaddle"]["RegenPaddle"] != 0
 
-    ret.cruiseState.enabled = self.main_on or ret.adaptiveCruise
+    ret.cruiseState.enabled = self.pcm_acc_status != AccState.OFF
+    ret.cruiseState.standstill = self.pcm_acc_status == AccState.STANDSTILL
 
     return ret
 
   @staticmethod
   def get_can_parser(CP):
-    # this function generates lists for signal, messages and initial values
     signals = [
-      # sig_name, sig_address, default
-      ("BrakePedalPosition", "EBCMBrakePedalPosition", 0),
-      ("FrontLeftDoor", "BCMDoorBeltStatus", 0),
-      ("FrontRightDoor", "BCMDoorBeltStatus", 0),
-      ("RearLeftDoor", "BCMDoorBeltStatus", 0),
-      ("RearRightDoor", "BCMDoorBeltStatus", 0),
-      ("LeftSeatBelt", "BCMDoorBeltStatus", 0),
-      ("RightSeatBelt", "BCMDoorBeltStatus", 0),
-      ("TurnSignals", "BCMTurnSignals", 0),
-      ("AcceleratorPedal", "AcceleratorPedal", 0),
-      ("CruiseState", "AcceleratorPedal2", 0),
-      ("ACCButtons", "ASCMSteeringButton", CruiseButtons.UNPRESS),
-      ("SteeringWheelAngle", "PSCMSteeringAngle", 0),
-      ("SteeringWheelRate", "PSCMSteeringAngle", 0),
-      ("FLWheelSpd", "EBCMWheelSpdFront", 0),
-      ("FRWheelSpd", "EBCMWheelSpdFront", 0),
-      ("RLWheelSpd", "EBCMWheelSpdRear", 0),
-      ("RRWheelSpd", "EBCMWheelSpdRear", 0),
-      ("PRNDL", "ECMPRDNL", 0),
-      ("LKADriverAppldTrq", "PSCMStatus", 0),
-      ("LKATorqueDelivered", "PSCMStatus", 0),
-      ("LKATorqueDeliveredStatus", "PSCMStatus", 0),
-      ("TractionControlOn", "ESPStatus", 0),
-      ("EPBClosed", "EPBStatus", 0),
-      ("CruiseMainOn", "ECMEngineStatus", 0),
-      ("ACCCmdActive", "ASCMActiveCruiseControlStatus", 0),
-      ("LKATotalTorqueDelivered", "PSCMStatus", 0),
-      ("VehicleSpeed", "ECMVehicleSpeed", 0),
-
+      # sig_name, sig_address
+      ("BrakePedalPosition", "EBCMBrakePedalPosition"),
+      ("FrontLeftDoor", "BCMDoorBeltStatus"),
+      ("FrontRightDoor", "BCMDoorBeltStatus"),
+      ("RearLeftDoor", "BCMDoorBeltStatus"),
+      ("RearRightDoor", "BCMDoorBeltStatus"),
+      ("LeftSeatBelt", "BCMDoorBeltStatus"),
+      ("RightSeatBelt", "BCMDoorBeltStatus"),
+      ("TurnSignals", "BCMTurnSignals"),
+      ("AcceleratorPedal2", "AcceleratorPedal2"),
+      ("CruiseState", "AcceleratorPedal2"),
+      ("ACCButtons", "ASCMSteeringButton"),
+      ("SteeringWheelAngle", "PSCMSteeringAngle"),
+      ("SteeringWheelRate", "PSCMSteeringAngle"),
+      ("FLWheelSpd", "EBCMWheelSpdFront"),
+      ("FRWheelSpd", "EBCMWheelSpdFront"),
+      ("RLWheelSpd", "EBCMWheelSpdRear"),
+      ("RRWheelSpd", "EBCMWheelSpdRear"),
+      ("PRNDL2", "ECMPRDNL2"),
+      ("ManualMode", "ECMPRDNL2"),
+      ("LKADriverAppldTrq", "PSCMStatus"),
+      ("LKATorqueDelivered", "PSCMStatus"),
+      ("LKATorqueDeliveredStatus", "PSCMStatus"),
+      ("TractionControlOn", "ESPStatus"),
+      ("CruiseMainOn", "ECMEngineStatus"),
+      ("Brake_Pressed", "ECMEngineStatus"),
+      ("ACCCmdActive", "ASCMActiveCruiseControlStatus"),
+      ("LKATotalTorqueDelivered", "PSCMStatus"),
+      ("VehicleSpeed", "ECMVehicleSpeed"),	  
     ]
 
+    checks = [
+      ("BCMTurnSignals", 1),
+      ("ECMPRDNL2", 10),
+      ("PSCMStatus", 10),
+      ("ESPStatus", 10),
+      ("BCMDoorBeltStatus", 10),
+      ("EBCMWheelSpdFront", 20),
+      ("EBCMWheelSpdRear", 20),
+      ("AcceleratorPedal2", 33),
+      ("ASCMSteeringButton", 33),
+      ("ECMEngineStatus", 100),
+      ("PSCMSteeringAngle", 100),
+      ("EBCMBrakePedalPosition", 100),
+    ]
 
-    if CP.carFingerprint == CAR.VOLT or CP.carFingerprint == CAR.BOLT:
-      signals += [
-        ("RegenPaddle", "EBCMRegenPaddle", 0),
-      ]
-
+    # TODO: Might be wise to find the non-electronic parking brake signal
+    # TODO: JJS Add hasEPB to cereal
+    if CP.carFingerprint != CAR.SUBURBAN and CP.carFingerprint != CAR.TAHOE_NR:
+      signals.append(("EPBClosed", "EPBStatus", 0))
+      checks.append(("EPBStatus", 20))
+    
 
     if CP.enableGasInterceptor:
-      signals += [
-        ("INTERCEPTOR_GAS", "GAS_SENSOR", 0),
-        ("INTERCEPTOR_GAS2", "GAS_SENSOR", 0)
-      ]
+      signals.append(("INTERCEPTOR_GAS", "GAS_SENSOR"))
+      signals.append(("INTERCEPTOR_GAS2", "GAS_SENSOR"))
+      checks.append(("GAS_SENSOR", 50))
 
+    if CP.carFingerprint in EV_CAR:
+      signals.append(("RegenPaddle", "EBCMRegenPaddle"))
+      checks.append(("EBCMRegenPaddle", 50))
 
-    return CANParser(DBC[CP.carFingerprint]['pt'], signals, [], CanBus.POWERTRAIN, enforce_checks=False)
+    return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, CanBus.POWERTRAIN)
 
   @staticmethod
   def get_loopback_can_parser(CP):
     signals = [
-      ("RollingCounter", "ASCMLKASteeringCmd", 0),
+      ("RollingCounter", "ASCMLKASteeringCmd"),
     ]
 
     checks = [
       ("ASCMLKASteeringCmd", 50),
-    ]
+	]
+	
+    return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, CanBus.LOOPBACK, enforce_checks=False)
 
-    return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, CanBus.LOOPBACK)
+## all bellows are for Brake Light
+  @staticmethod
+  def get_chassis_can_parser(CP):
+    # this function generates lists for signal, messages and initial values
+    signals = [
+      # sig_name, sig_address, default
+      ("FrictionBrakePressure", "EBCMFrictionBrakeStatus"),
+    ]
+    checks = []
+    return CANParser(DBC[CP.carFingerprint]["chassis"], signals, checks, CanBus.CHASSIS, enforce_checks=False)

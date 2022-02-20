@@ -142,6 +142,7 @@ struct CarState {
   vEgoRaw @17 :Float32;     # unfiltered speed from CAN sensors
   yawRate @22 :Float32;     # best estimate of yaw rate
   standstill @18 :Bool;
+
   wheelSpeeds @2 :WheelSpeeds;
   vehicleSpeed @41 :Float32;
 
@@ -603,7 +604,7 @@ struct CarParams {
   }
 
   enableCameraDEPRECATED @4 :Bool;
-  isPandaBlackDEPRECATED @39: Bool;
+  isPandaBlack @39: Bool;
   hasStockCameraDEPRECATED @57 :Bool;
   safetyParamDEPRECATED @10 :Int16;
   safetyModelDEPRECATED @9 :SafetyModel;
