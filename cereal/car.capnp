@@ -69,7 +69,6 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     preLaneChangeLeft @57;
     preLaneChangeRight @58;
     laneChange @59;
-    communityFeatureDisallowed @62;
     lowMemory @63;
     stockAeb @64;
     ldw @65;
@@ -105,10 +104,12 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     localizerMalfunction @103;
     highCpuUsage @105;
     cruiseMismatch @106;
+    lkasDisabled @107;
 
-    driverMonitorLowAccDEPRECATED @68;
     radarCanErrorDEPRECATED @15;
+    communityFeatureDisallowedDEPRECATED @62;
     radarCommIssueDEPRECATED @67;
+    driverMonitorLowAccDEPRECATED @68;
     gasUnavailableDEPRECATED @3;
     dataNeededDEPRECATED @16;
     modelCommIssueDEPRECATED @27;
@@ -142,11 +143,8 @@ struct CarState {
   vEgoRaw @17 :Float32;     # unfiltered speed from CAN sensors
   yawRate @22 :Float32;     # best estimate of yaw rate
   standstill @18 :Bool;
-
   wheelSpeeds @2 :WheelSpeeds;
   vehicleSpeed @41 :Float32;
-
-
 
   # gas pedal, 0.0-1.0
   gas @3 :Float32;        # this is user pedal only
@@ -255,7 +253,7 @@ struct CarState {
   }
 
   errorsDEPRECATED @0 :List(CarEvent.EventName);
-  #brakeLightsDEPRECATED @19 :Bool;
+  brakeLightsDEPRECATED @19 :Bool;
 }
 
 # ******* radar state @ 20hz *******
@@ -299,7 +297,14 @@ struct CarControl {
   enabled @0 :Bool;
   active @7 :Bool;
 
+  # Actuator commands as computed by controlsd
   actuators @6 :Actuators;
+
+  # Any car specific rate limits or quirks applied by
+  # the CarController are reflected in actuatorsOutput
+  # and matches what is sent to the car
+  actuatorsOutput @10 :Actuators;
+
   roll @8 :Float32;
   pitch @9 :Float32;
 
@@ -314,6 +319,7 @@ struct CarControl {
     steer @2: Float32;
     steeringAngleDeg @3: Float32;
 
+    speed @6: Float32; # m/s
     accel @4: Float32; # m/s^2
     longControlState @5: LongControlState;
 
@@ -321,7 +327,8 @@ struct CarControl {
       off @0;
       pid @1;
       stopping @2;
-      starting @3;
+
+      startingDEPRECATED @3;
     }
 
   }
@@ -433,14 +440,12 @@ struct CarParams {
   vEgoStarting @59 :Float32; # Speed at which the car goes into starting state
   directAccelControl @30 :Bool; # Does the car have direct accel control or just gas/brake
   stoppingControl @31 :Bool; # Does the car allows full control even at lows speeds when stopping
-  startAccel @32 :Float32; # Required acceleraton to overcome creep braking
   stopAccel @60 :Float32; # Required acceleraton to keep vehicle stationary
   steerRateCost @33 :Float32; # Lateral MPC cost on steering rate
   steerControlType @34 :SteerControlType;
   radarOffCan @35 :Bool; # True when radar objects aren't visible on CAN
   minSpeedCan @51 :Float32; # Minimum vehicle speed from CAN (below this value drops to 0)
   stoppingDecelRate @52 :Float32; # m/s^2/s while trying to stop
-  startingAccelRate @53 :Float32; # m/s^2/s while trying to start
 
   steerActuatorDelay @36 :Float32; # Steering wheel actuator delay in seconds
   longitudinalActuatorDelayLowerBound @61 :Float32; # Gas/Brake actuator delay in seconds, lower bound
@@ -452,7 +457,6 @@ struct CarParams {
   carFw @44 :List(CarFw);
 
   radarTimeStep @45: Float32 = 0.05;  # time delta between radar updates, 20Hz is very standard
-  communityFeature @46: Bool;  # true if a community maintained feature is detected
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
 
@@ -474,8 +478,6 @@ struct CarParams {
     kiBP @2 :List(Float32);
     kiV @3 :List(Float32);
     kf @4 :Float32;
-    kdBP @5 :List(Float32);
-    kdV @6 :List(Float32);
   }
 
   struct LongitudinalPIDTuning {
@@ -604,9 +606,12 @@ struct CarParams {
   }
 
   enableCameraDEPRECATED @4 :Bool;
-  isPandaBlack @39: Bool;
+  isPandaBlackDEPRECATED @39 :Bool;
   hasStockCameraDEPRECATED @57 :Bool;
   safetyParamDEPRECATED @10 :Int16;
   safetyModelDEPRECATED @9 :SafetyModel;
   safetyModelPassiveDEPRECATED @42 :SafetyModel = silent;
+  startAccelDEPRECATED @32 :Float32;
+  communityFeatureDEPRECATED @46: Bool;
+  startingAccelRateDEPRECATED @53 :Float32;
 }
