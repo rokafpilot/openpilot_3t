@@ -314,14 +314,18 @@ class CarInterface(CarInterfaceBase):
       events.add(EventName.belowEngageSpeed)
     if self.CS.park_brake:
       events.add(EventName.parkBrake)
-    # belowsteerspeed alertevent는 내지 않도록 한다. 텍스트로 표시만 따로 하여 debug ui 출력을 확보한다.
-    # if ret.vEgo < self.CP.minSteerSpeed:
-    #   events.add(car.CarEvent.EventName.belowSteerSpeed)
+    if ret.cruiseState.standstill:
+      events.add(EventName.resumeRequired)
+    if (self.CS.CP.carFingerprint not in NO_ASCM) and self.CS.pcm_acc_status == AccState.FAULTED:
+      events.add(EventName.accFaulted)
+    #if ret.vEgo < self.CP.minSteerSpeed:
+    #  events.add(car.CarEvent.EventName.belowSteerSpeed)
+
     if self.CP.enableGasInterceptor:
       if self.CS.adaptive_Cruise and ret.brakePressed:
         events.add(EventName.pedalPressed)
         self.CS.adaptive_Cruise = False
-        self.CS.enable_lkas = False
+        self.CS.enable_lkas = False	  
 
     # handle button presses
     if self.CP.enableGasInterceptor:
