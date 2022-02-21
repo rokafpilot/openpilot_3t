@@ -489,7 +489,7 @@ static void sensors_init(MultiCameraState *s) {
 
   unique_fd sensorinit_fd;
   if (s->device == DEVICE_LP3) {
-    sensorinit_fd = open_v4l_by_name_and_index("msm_sensor_init");
+    sensorinit_fd = HANDLE_EINTR(open("/dev/v4l-subdev11", O_RDWR | O_NONBLOCK));
   } else {
     sensorinit_fd = (open("/dev/v4l-subdev12", O_RDWR | O_NONBLOCK));
   }
@@ -710,22 +710,57 @@ static void camera_open(CameraState *s, bool is_road_cam) {
   struct msm_ois_cfg_data ois_cfg_data = {};
 
   // open devices
-  s->csid_fd = open_v4l_by_name_and_index("msm_csid", is_road_cam ? 0 : 2);
-  assert(s->csid_fd >= 0);
-  s->csiphy_fd = open_v4l_by_name_and_index("msm_csiphy", is_road_cam ? 0 : 2);
-  assert(s->csiphy_fd >= 0);
-  s->isp_fd = open_v4l_by_name_and_index("vfe", is_road_cam ? 0 : 1);
-  assert(s->isp_fd >= 0);
-
+  const char *sensor_dev;
   if (is_road_cam) {
-    s->actuator_fd = open_v4l_by_name_and_index("msm_actuator");
+    s->csid_fd = HANDLE_EINTR(open("/dev/v4l-subdev3", O_RDWR | O_NONBLOCK));
+    assert(s->csid_fd >= 0);
+    s->csiphy_fd = HANDLE_EINTR(open("/dev/v4l-subdev0", O_RDWR | O_NONBLOCK));
+    assert(s->csiphy_fd >= 0);
+    if (s->device == DEVICE_LP3) {
+    sensor_dev = "/dev/v4l-subdev17";
+    } else {
+      sensor_dev = "/dev/v4l-subdev18";
+    }
+    if (s->device == DEVICE_LP3) {
+    s->isp_fd = HANDLE_EINTR(open("/dev/v4l-subdev13", O_RDWR | O_NONBLOCK));
+    } else {
+      s->isp_fd = HANDLE_EINTR(open("/dev/v4l-subdev14", O_RDWR | O_NONBLOCK));
+    }
+    assert(s->isp_fd >= 0);
+    s->eeprom_fd = HANDLE_EINTR(open("/dev/v4l-subdev8", O_RDWR | O_NONBLOCK));
+    assert(s->eeprom_fd >= 0);
+
+    s->actuator_fd = HANDLE_EINTR(open("/dev/v4l-subdev7", O_RDWR | O_NONBLOCK));
     assert(s->actuator_fd >= 0);
+
+    if (s->device != DEVICE_LP3) {
+      s->ois_fd = HANDLE_EINTR(open("/dev/v4l-subdev10", O_RDWR | O_NONBLOCK));
+      assert(s->ois_fd >= 0);
+    }
+  } else {
+    s->csid_fd = HANDLE_EINTR(open("/dev/v4l-subdev5", O_RDWR | O_NONBLOCK));
+    assert(s->csid_fd >= 0);
+    s->csiphy_fd = HANDLE_EINTR(open("/dev/v4l-subdev2", O_RDWR | O_NONBLOCK));
+    assert(s->csiphy_fd >= 0);
+    if (s->device == DEVICE_LP3) {
+    sensor_dev = "/dev/v4l-subdev18";
+    } else {
+      sensor_dev = "/dev/v4l-subdev19";
+    }
+    if (s->device == DEVICE_LP3) {
+      s->isp_fd = HANDLE_EINTR(open("/dev/v4l-subdev14", O_RDWR | O_NONBLOCK));
+    } else {
+      s->isp_fd = HANDLE_EINTR(open("/dev/v4l-subdev15", O_RDWR | O_NONBLOCK));
+    }
+    assert(s->isp_fd >= 0);
+    s->eeprom_fd = HANDLE_EINTR(open("/dev/v4l-subdev9", O_RDWR | O_NONBLOCK));
+    assert(s->eeprom_fd >= 0);
   }
 
   // wait for sensor device
   // on first startup, these devices aren't present yet
   for (int i = 0; i < 10; i++) {
-    s->sensor_fd = open_v4l_by_name_and_index(is_road_cam ? "imx298" : "ov8865_sunny");
+    s->sensor_fd = HANDLE_EINTR(open(sensor_dev, O_RDWR | O_NONBLOCK));
     if (s->sensor_fd >= 0) break;
     LOGW("waiting for sensors...");
     util::sleep_for(1000); // sleep one second
@@ -1337,7 +1372,7 @@ void cameras_open(MultiCameraState *s) {
   assert(s->v4l_fd >= 0);
 
   if (s->device == DEVICE_LP3) {
-  s->ispif_fd = open_v4l_by_name_and_index("msm_ispif");
+  s->ispif_fd = HANDLE_EINTR(open("/dev/v4l-subdev15", O_RDWR | O_NONBLOCK));
   } else {
     s->ispif_fd = HANDLE_EINTR(open("/dev/v4l-subdev16", O_RDWR | O_NONBLOCK));
   }
