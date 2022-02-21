@@ -206,7 +206,8 @@ void tick_handler(void) {
       if (controls_allowed && !heartbeat_engaged) {
         heartbeat_engaged_mismatches += 1U;
         if (heartbeat_engaged_mismatches >= 3U) {
-          controls_allowed = 0U;
+          //TODO: JJS: Scorched Earth
+          //controls_allowed = 0U;
         }
       } else {
         heartbeat_engaged_mismatches = 0U;
@@ -214,7 +215,6 @@ void tick_handler(void) {
 
       if (!heartbeat_disabled) {
         // if the heartbeat has been gone for a while, go to SILENT safety mode and enter power save
-		// MDPS will hard fault if SAFETY_SILENT set or panda slept
         if (heartbeat_counter >= (check_started() ? HEARTBEAT_IGNITION_CNT_ON : HEARTBEAT_IGNITION_CNT_OFF)) {
           puts("device hasn't sent a heartbeat for 0x");
           puth(heartbeat_counter);

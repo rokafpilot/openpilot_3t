@@ -139,7 +139,9 @@ void safety_tick(const addr_checks *rx_checks) {
       bool lagging = elapsed_time > MAX(rx_checks->check[i].msg[rx_checks->check[i].index].expected_timestep * MAX_MISSED_MSGS, 1e6);
       rx_checks->check[i].lagging = lagging;
       if (lagging) {
-        controls_allowed = 0;
+        //TODO: JJS remove - figure out why this is firing, if it is...
+        //TODO: JJS maybe need to disable forwarding....
+        //controls_allowed = 0;
       }
     }
   }
@@ -159,7 +161,8 @@ bool is_msg_valid(AddrCheckStruct addr_list[], int index) {
   if (index != -1) {
     if ((!addr_list[index].valid_checksum) || (addr_list[index].wrong_counters >= MAX_WRONG_COUNTERS)) {
       valid = false;
-      controls_allowed = 0;
+      //TODO: JJS: Scorched Earth
+      //controls_allowed = 0;
     }
   }
   return valid;
